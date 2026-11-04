@@ -1,20 +1,25 @@
 {
   "name": "dflix-series-streamio-addon",
-  "version": "1.0.0",
-  "description": "DFlix Series addon for Streamio",
+  "version": "1.1.0",
+  "description": "DhakaFlix (BDIX) addon for Stremio with a public relay",
   "main": "index.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "public": "node index.js --tunnel",
+    "tunnel:install": "node scripts/fetch-cloudflared.js",
+    "smoke": "node scripts/smoke.js",
+    "health": "node -e \"fetch(process.env.URL||'http://127.0.0.1:7001/health').then(r=>r.json()).then(j=>console.log(JSON.stringify(j,null,2)))\""
   },
   "dependencies": {
     "axios": "^1.6.0",
     "cheerio": "^1.0.0-rc.12",
-    "localtunnel": "^2.0.2",
     "stremio-addon-sdk": "^1.6.10"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1",
-    "pkg": "^5.8.1"
+    "nodemon": "^3.0.1"
   }
 }

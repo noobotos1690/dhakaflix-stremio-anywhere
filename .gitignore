@@ -1,3 +1,10 @@
 node_modules/
 /server-copy.js
 
+# cloudflared binary and local runtime artifacts
+tools/
+logs/
+.run/
+*.log
+.env
+.env.local

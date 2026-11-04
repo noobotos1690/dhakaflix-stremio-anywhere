@@ -1,0 +1,9 @@
+node_modules
+tools
+.git
+.gitignore
+*.log
+.env
+.env.local
+README.md
+design-system

@@ -1,0 +1,39 @@
+# DhakaFlix relay + optional Cloudflare Tunnel.
+#
+#   docker compose up -d                       # relay only, reach it on :7001
+#   docker compose --profile tunnel up -d      # relay + stable public hostname
+#
+# The tunnel profile needs TUNNEL_TOKEN and PUBLIC_URL in .env.
+
+services:
+  relay:
+    build: .
+    image: dhakaflix-relay:latest
+    container_name: dhakaflix-relay
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: "7001"
+      STREAM_MODE: "${STREAM_MODE:-proxy}"
+      MAX_PROXY_STREAMS: "${MAX_PROXY_STREAMS:-8}"
+      PUBLIC_URL: "${PUBLIC_URL:-}"
+    ports:
+      - "${PORT:-7001}:7001"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: dhakaflix-tunnel
+    restart: unless-stopped
+    profiles: ["tunnel"]
+    command: ["tunnel", "--no-autoupdate", "run", "--token", "${TUNNEL_TOKEN}"]
+    depends_on:
+      relay:
+        condition: service_healthy

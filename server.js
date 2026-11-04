@@ -1,8 +1,10 @@
 const { addonBuilder } = require('stremio-addon-sdk');
 const axios = require('axios');
 const cheerio = require('cheerio');
-const http = require('http');
-const url = require('url');
+
+const config = require('./src/config');
+const health = require('./src/health');
+const { makeToken } = require('./src/proxy');
 
 // Stremio Meta API configuration
 const STREMIO_METAHUB_URL = 'https://v3-cinemeta.strem.io';
@@ -24,72 +26,8 @@ const PROVIDER_TIMEOUTS = {
     }
 };
 
-// Provider configurations
-const PROVIDERS = {
-    dhakaflix14: {
-        mainUrl: 'http://172.16.50.14',
-        serverName: 'DHAKA-FLIX-14',
-        name: '(BDIX) DhakaFlix 14',
-        tvSeriesKeyword: ['KOREAN%20TV%20%26%20WEB%20Series'],
-        supportedTypes: ['movie', 'series'],
-        mainPage: {
-            'Animation Movies (1080p)/': 'Animation Movies',
-            'English Movies (1080p)/(2024) 1080p/': 'English Movies',
-            'Hindi Movies/(2024)/': 'Hindi Movies',
-            'IMDb Top-250 Movies/': 'IMDb Top-250 Movies',
-            'SOUTH INDIAN MOVIES/Hindi Dubbed/(2024)/': 'Hindi Dubbed',
-            'SOUTH INDIAN MOVIES/South Movies/2024/': 'South Movies',
-            '/KOREAN TV %26 WEB Series/': 'Korean TV & WEB Series'
-        }
-    },
-    dhakaflix12: {
-        mainUrl: 'http://172.16.50.12',
-        serverName: 'DHAKA-FLIX-12',
-        name: '(BDIX) DhakaFlix 12',
-        tvSeriesKeyword: ['TV-WEB-Series'],
-        supportedTypes: ['series'],
-        mainPage: {
-            'TV-WEB-Series/TV Series ★%20 0%20 —%20 9/': 'TV Series ★ 0 — 9',
-            'TV-WEB-Series/TV Series ♥%20 A%20 —%20 L/': 'TV Series ♥ A — L',
-            'TV-WEB-Series/TV Series ♦%20 M%20 —%20 R/': 'TV Series ♦ M — R',
-            'TV-WEB-Series/TV Series ♦%20 S%20 —%20 Z/': 'TV Series ♦ S — Z'
-        }
-    },
-    dhakaflix9: {
-        mainUrl: 'http://172.16.50.9',
-        serverName: 'DHAKA-FLIX-9',
-        name: '(BDIX) DhakaFlix 9',
-        tvSeriesKeyword: ['Awards', 'WWE', 'KOREAN', 'Documentary', 'Anime'],
-        supportedTypes: ['movie', 'series', 'anime'],
-        mainPage: {
-            'Anime %26 Cartoon TV Series/Anime-TV Series ♥%20 A%20 —%20 F/': 'Anime TV Series',
-            'KOREAN TV %26 WEB Series/': 'KOREAN TV & WEB Series',
-            'Documentary/': 'Documentary',
-            'Awards %26 TV Shows/%23 TV SPECIAL %26 SHOWS/': 'TV SPECIAL & SHOWS',
-            'Awards %26 TV Shows/%23 AWARDS/': 'Awards',
-            'WWE %26 AEW Wrestling/WWE Wrestling/': 'WWE Wrestling',
-            'WWE %26 AEW Wrestling/AEW Wrestling/': 'AEW Wrestling'
-        }
-    },
-    dhakaflix7: {
-        mainUrl: 'http://172.16.50.7',
-        serverName: 'DHAKA-FLIX-7',
-        name: '(BDIX) DhakaFlix 7',
-        tvSeriesKeyword: [],
-        supportedTypes: ['movie'],
-        mainPage: {
-            'English Movies/(2024)/': 'English Movies',
-            'English Movies (1080p)/(2024) 1080p/': 'English Movies (1080p)',
-            '3D Movies/': '3D Movies',
-            'Foreign Language Movies/Japanese Language/': 'Japanese Movies',
-            'Foreign Language Movies/Korean Language/': 'Korean Movies',
-            'Foreign Language Movies/Bangla Dubbing Movies/': 'Bangla Dubbing Movies',
-            'Foreign Language Movies/Pakistani Movie/': 'Pakistani Movies',
-            'Kolkata Bangla Movies/(2024)/': 'Kolkata Bangla Movies',
-            'Foreign Language Movies/Chinese Language/': 'Chinese Movies'
-        }
-    }
-};
+// Provider configurations (BDIX mirrors) live in src/providers.js
+const { PROVIDERS } = require('./src/providers');
 
 const manifest = require('./addon.json');
 const builder = new addonBuilder(manifest);
@@ -222,6 +160,47 @@ function constructUrl(baseUrl, path) {
     // Ensure there's a single slash between baseUrl and path
     const url = `${baseUrl.replace(/\/$/, '')}/${cleanPath.replace(/^\//, '')}`;
     return url;
+}
+
+// ---------------------------------------------------------------------------
+// Stream delivery
+// ---------------------------------------------------------------------------
+
+// Origin-relative relay path; the public server absolutizes it per request.
+function relayPath(targetUrl) {
+    return `/p/${makeToken(config.proxySecret, targetUrl, config.proxyTtlSeconds)}`;
+}
+
+/**
+ * Turn one upstream file into Stremio stream entries according to STREAM_MODE:
+ *   proxy  - relayed through this server, playable anywhere (default)
+ *   direct - raw BDIX address, only reachable from inside the ISP network
+ *   both   - emit both, relayed first
+ */
+function buildStreamEntries({ title, targetUrl, providerName, detail }) {
+    if (!targetUrl) return [];
+
+    const label = providerName || 'DhakaFlix';
+    const streamTitle = detail ? `${title}\n${detail}` : title;
+    const entries = [];
+
+    if (config.streamMode === 'proxy' || config.streamMode === 'both') {
+        entries.push({
+            name: label,
+            title: streamTitle,
+            url: relayPath(targetUrl)
+        });
+    }
+
+    if (config.streamMode === 'direct' || config.streamMode === 'both') {
+        entries.push({
+            name: config.streamMode === 'both' ? `${label} · direct` : label,
+            title: streamTitle,
+            url: targetUrl
+        });
+    }
+
+    return entries;
 }
 
 // Helper function to extract movie title and year from filename
@@ -430,9 +409,11 @@ async function search(query, provider, extendedTimeout = false) {
 
         logDebug('SEARCH', `Final search results: ${results.length} items`);
         
+        health.markSuccess(provider.id);
         searchCache.set(cacheKey, results);
         updateCacheTimestamp('search', cacheKey);
         return results;    } catch (error) {
+        health.markFailure(provider.id, error);
         const isTimeout = error.message === 'Timeout' || error.code === 'ECONNABORTED';
         if (isTimeout) {
             logDebug('SEARCH_ERROR', `Timeout searching for "${query}" in ${provider.name}`, { error: error.message });
@@ -481,7 +462,13 @@ async function performParallelSearch(query, type, extendedTimeout, specificProvi
         ? Object.entries(PROVIDERS).filter(([id]) => specificProviders.includes(id))
         : Object.entries(PROVIDERS);
         
-    const filteredProviders = providers.filter(([_, provider]) => provider.supportedTypes.includes(type));
+    const filteredProviders = providers.filter(([_, provider]) =>
+        provider.supportedTypes.includes(type) && health.isAvailable(provider.id)
+    );
+
+    if (filteredProviders.length === 0 && providers.length > 0) {
+        logDebug('SEARCH_WARN', 'All candidate mirrors are currently marked offline, skipping search');
+    }
     
     // Debug log
     logDebug('SEARCH_DEBUG', `Performing ${extendedTimeout ? 'extended' : 'normal'} search for ${filteredProviders.length} providers: ${filteredProviders.map(([id]) => id).join(', ')}`);
@@ -949,7 +936,7 @@ builder.defineStreamHandler(async ({ type, id }) => {
 
         // Search all providers for the series
         for (const [providerId, provider] of Object.entries(PROVIDERS)) {
-            if (!provider.supportedTypes.includes(type)) continue;
+            if (!provider.supportedTypes.includes(type) || !health.isAvailable(provider.id)) continue;
 
             logDebug('STREAM', `Searching provider ${providerId} for series: ${meta.name}`);
             try {
@@ -983,10 +970,11 @@ builder.defineStreamHandler(async ({ type, id }) => {
 
                         if (targetEpisode) {
                             logDebug('STREAM', `Found episode S${seasonNum}E${episodeNum}: ${targetEpisode.name}`);
-                            const streams = [{
+                            const streams = buildStreamEntries({
                                 title: targetEpisode.name,
-                                url: targetEpisode.url
-                            }];
+                                targetUrl: targetEpisode.url,
+                                providerName: provider.name
+                            });
                             
                             streamCache.set(id, streams);
                             updateCacheTimestamp('stream', id);
@@ -1018,7 +1006,7 @@ builder.defineStreamHandler(async ({ type, id }) => {
         // Search all providers using the show name
         const allStreams = [];
         for (const [providerId, provider] of Object.entries(PROVIDERS)) {
-            if (!provider.supportedTypes.includes(type)) continue;
+            if (!provider.supportedTypes.includes(type) || !health.isAvailable(provider.id)) continue;
 
             logDebug('STREAM', `Searching provider ${providerId} for: ${meta.name}`);
             try {
@@ -1110,10 +1098,11 @@ builder.defineStreamHandler(async ({ type, id }) => {
                         if (type === 'series' && content.episodes) {
                             // For series, add all episode streams
                             content.episodes.forEach(episode => {
-                                allStreams.push({
+                                allStreams.push(...buildStreamEntries({
                                     title: episode.name,
-                                    url: episode.url
-                                });
+                                    targetUrl: episode.url,
+                                    providerName: provider.name
+                                }));
                             });
                         } else if (content.videoFiles) {
                             // For movies with multiple video files
@@ -1128,17 +1117,19 @@ builder.defineStreamHandler(async ({ type, id }) => {
                                 //     title = `[Sub] ${title}`;
                                 // }
                                 
-                                allStreams.push({
+                                allStreams.push(...buildStreamEntries({
                                     title: title,
-                                    url: videoFile.url
-                                });
+                                    targetUrl: videoFile.url,
+                                    providerName: provider.name
+                                }));
                             });
                         } else if (content.url) {
                             // Fallback for direct episode links or old format
-                            allStreams.push({
+                            allStreams.push(...buildStreamEntries({
                                 title: matchingResult.name,
-                                url: content.url
-                            });
+                                targetUrl: content.url,
+                                providerName: provider.name
+                            }));
                         }
                     }
                 }
@@ -1166,7 +1157,7 @@ builder.defineStreamHandler(async ({ type, id }) => {
                 logDebug('STREAM', `Using simplified title for fallback search: "${simplified}"`);
                 // Search with simplified title across all providers
                 for (const [providerId, provider] of Object.entries(PROVIDERS)) {
-                    if (!provider.supportedTypes.includes(type)) continue;
+                    if (!provider.supportedTypes.includes(type) || !health.isAvailable(provider.id)) continue;
                     
                     try {
                         const fallbackResults = await search(simplified, provider);
@@ -1233,17 +1224,19 @@ builder.defineStreamHandler(async ({ type, id }) => {
                                 if (content.videoFiles && content.videoFiles.length > 0) {
                                     // Handle movies with multiple video files
                                     content.videoFiles.forEach(videoFile => {
-                                        streams.push({
+                                        streams.push(...buildStreamEntries({
                                             title: videoFile.name,
-                                            url: videoFile.url
-                                        });
+                                            targetUrl: videoFile.url,
+                                            providerName: provider.name
+                                        }));
                                     });
                                 } else if (content.url) {
                                     // Handle direct URL content
-                                    streams.push({
+                                    streams.push(...buildStreamEntries({
                                         title: bestMatch.name,
-                                        url: content.url
-                                    });
+                                        targetUrl: content.url,
+                                        providerName: provider.name
+                                    }));
                                 }
                                 
                                 if (streams.length > 0) {
@@ -1287,17 +1280,19 @@ builder.defineStreamHandler(async ({ type, id }) => {
         if (type === 'series' && content.episodes) {
             // For series, add all episode streams
             content.episodes.forEach(episode => {
-                streams.push({
+                streams.push(...buildStreamEntries({
                     title: episode.name,
-                    url: episode.url
-                });
+                    targetUrl: episode.url,
+                    providerName: provider.name
+                }));
             });
         } else if (content.url) {
             // For movies or direct episode links
-            streams.push({
+            streams.push(...buildStreamEntries({
                 title: content.name,
-                url: content.url
-            });
+                targetUrl: content.url,
+                providerName: provider.name
+            }));
         }
 
         if (streams.length > 0) {
@@ -1315,30 +1310,11 @@ builder.defineStreamHandler(async ({ type, id }) => {
 
 const addonInterface = builder.getInterface();
 
+// Surfaces used by the public server's /health endpoint.
+addonInterface.getStats = () => ({
+    search: searchCache.size,
+    stream: streamCache.size
+});
+
 // Export the addon interface
 module.exports = addonInterface;
-
-// If this file is run directly, start the server
-if (require.main === module) {
-    // Create and start the HTTP server
-    const server = http.createServer((req, res) => {
-        const startTime = process.hrtime();
-        
-        // Log the request
-        const reqUrl = url.parse(req.url);
-        logDebug('SERVER', `${req.method} ${reqUrl.pathname}`);
-        
-        // Response handler to capture timing
-        const originalEnd = res.end;
-        res.end = function() {
-            const diff = process.hrtime(startTime);
-            const responseTime = (diff[0] * 1e9 + diff[1]) / 1e6; // Convert to ms
-            logDebug('SERVER', `Response ${res.statusCode} sent in ${responseTime.toFixed(2)}ms`);
-            return originalEnd.apply(this, arguments);
-        };
-        
-        // Process the request
-        addonInterface(req, res);
-    });
-
-}
