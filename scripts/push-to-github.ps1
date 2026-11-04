@@ -10,7 +10,7 @@
         upstream -> https://github.com/Niloy-Sarker/dhakaflix-stremio-addon.git
 
     It then commits any pending changes and pushes. If GitHub credentials are not
-    cached yet, Git Credential Manager opens a browser window once — sign in and
+    cached yet, Git Credential Manager opens a browser window once - sign in and
     the push completes by itself.
 
 .PARAMETER User
@@ -92,7 +92,7 @@ if (-not $exists) {
 
 Create it first (one of these), then run this script again:
 
-  A) Recommended — make it a real fork so GitHub shows the lineage:
+  A) Recommended - make it a real fork so GitHub shows the lineage:
      https://github.com/$upstreamSlug/fork
 
   B) Or an empty repository with the same name:
@@ -173,7 +173,7 @@ if ($LASTEXITCODE -ne 0) {
 
 Push failed. Most common causes:
 
-  * You were not signed in to GitHub yet — Git Credential Manager should have
+  * You were not signed in to GitHub yet - Git Credential Manager should have
     opened a browser window. Sign in, then run this script again.
   * The remote has commits you do not have locally. Run:
         git pull --rebase origin $branch
