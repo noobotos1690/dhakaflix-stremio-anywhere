@@ -12,6 +12,7 @@
     "public": "node index.js --tunnel",
     "tunnel:install": "node scripts/fetch-cloudflared.js",
     "smoke": "node scripts/smoke.js",
+    "desktop:build": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/build.ps1",
     "health": "node -e \"fetch(process.env.URL||'http://127.0.0.1:7001/health').then(r=>r.json()).then(j=>console.log(JSON.stringify(j,null,2)))\""
   },
   "dependencies": {

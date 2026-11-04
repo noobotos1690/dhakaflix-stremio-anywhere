@@ -68,6 +68,34 @@ Relay is running (pid 4820)
 Paste that URL into Stremio → Addons → Community on **any** device. The URL is
 copied to your clipboard for you.
 
+## Desktop app (Windows, one-click)
+
+Prefer a window over a terminal? Download one of these from the
+[Releases page](https://github.com/noobotos1690/dhakaflix-stremio-anywhere/releases/latest):
+
+| Build | What it does |
+| --- | --- |
+| `DhakaFlixRelay-Setup-1.1.0.exe` | Per-user installer with Start Menu/desktop shortcuts and an uninstaller |
+| `DhakaFlixRelay-Portable-1.1.0.zip` | Unzip anywhere and run `DhakaFlixRelay.exe`; no install |
+
+Both need no administrator rights. The dashboard gives you Start/Stop, live
+status, the Stremio install link, realtime logs and a launch-at-Windows-startup
+toggle. On first launch it installs Node.js, the npm packages, `cloudflared` and
+`.env` locally with a progress bar (admin only if the automatic Node.js download
+is blocked, where it offers a winget install). The first successful start opens
+Stremio so the addon can be added immediately.
+
+Closing the window keeps the relay running in the tray; the app is only
+terminated from the tray icon. Because the quick tunnel gets a new URL on every
+start, exiting shows a reminder to remove the addon from Stremio first (or use a
+[named tunnel](#public-install-stable-hostname) for a permanent link).
+
+![DhakaFlix Relay desktop dashboard](docs/desktop-app.png)
+
+Build it with `.\desktop\build.ps1` (needs the .NET SDK, .NET Framework 4.8
+reference assemblies and Inno Setup 6); it also produces the portable zip.
+Details, file locations and troubleshooting: [desktop/README.md](desktop/README.md).
+
 ## Quick start (local / any OS)
 
 ```bash

@@ -8,3 +8,15 @@ logs/
 *.log
 .env
 .env.local
+
+# desktop app build output and test scratch
+desktop/dist/
+desktop/assets/
+desktop/runtime-test/
+desktop/portable-test/
+desktop/install-test/
+desktop/build.log
+desktop/*.png
+desktop/install-final/
+desktop/quittest/
+desktop/stremiotest/
