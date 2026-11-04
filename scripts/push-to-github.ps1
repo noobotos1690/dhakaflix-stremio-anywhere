@@ -35,7 +35,7 @@
 [CmdletBinding()]
 param(
     [string]$User = '',
-    [string]$Repo = 'dhakaflix-stremio-addon',
+    [string]$Repo = 'dhakaflix-stremio-anywhere',
     [string]$Message = '',
     [switch]$Force
 )
