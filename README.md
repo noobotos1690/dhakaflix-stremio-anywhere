@@ -274,7 +274,7 @@ so you can sign in to GitHub — after that the credential is cached and later
 pushes need no interaction.
 
 ```
-origin   https://github.com/<you>/dhakaflix-stremio-addon.git    (your fork)
+origin   https://github.com/<you>/<your-fork>.git                (your fork)
 upstream https://github.com/Niloy-Sarker/dhakaflix-stremio-addon.git
 ```
 
