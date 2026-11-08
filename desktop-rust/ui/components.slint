@@ -1,0 +1,652 @@
+import { Theme } from "theme.slint";
+
+export component Panel inherits Rectangle {
+    background: Theme.surface;
+    border-radius: Theme.radius;
+    border-width: 1px;
+    border-color: Theme.border;
+    vertical-stretch: 0;
+    @children
+}
+
+export component SectionHeader inherits VerticalLayout {
+    in property <string> title;
+    in property <string> subtitle: "";
+    spacing: 3px;
+    alignment: start;
+    Text {
+        text: root.title;
+        color: Theme.text;
+        font-size: 14px;
+        font-weight: 600;
+        font-family: Theme.font;
+    }
+    if root.subtitle != "" : Text {
+        text: root.subtitle;
+        color: Theme.text-2;
+        font-size: 12px;
+        font-family: Theme.font;
+        wrap: word-wrap;
+    }
+}
+
+export component AppButton inherits Rectangle {
+    in property <string> text;
+    in property <int> variant: 1; // 0 primary, 1 secondary, 2 ghost, 3 danger
+    in property <bool> enabled: true;
+    in property <bool> busy: false;
+    callback clicked;
+
+    height: 34px;
+    width: 96px;
+    border-radius: Theme.radius-sm;
+    border-width: variant == 1 || variant == 3 ? 1px : 0px;
+    border-color: variant == 3 ? #5a3438 : Theme.border;
+    background: !enabled ? Theme.container
+        : variant == 0 ? (touch.pressed ? #6849bd : touch.has-hover ? Theme.accent-hover : Theme.accent)
+        : variant == 1 ? (touch.pressed ? Theme.raised : touch.has-hover ? #262838 : Theme.container)
+        : variant == 3 ? (touch.pressed ? #3b2427 : touch.has-hover ? #3a2528 : Theme.error-soft)
+        : touch.has-hover ? Theme.container : transparent;
+    accessible-role: button;
+    accessible-label: text;
+    accessible-enabled: enabled;
+    animate background { duration: 100ms; }
+
+    touch := TouchArea {
+
+        width: 100%;
+
+        height: 100%;
+        mouse-cursor: pointer;
+        enabled: root.enabled && !root.busy;
+        clicked => {
+            if (root.enabled && !root.busy) {
+                root.clicked();
+            }
+        }
+    }
+
+    Text {
+        text: root.busy ? "Working..." : root.text;
+        color: !root.enabled ? Theme.text-3
+            : root.variant == 0 ? #ffffff
+            : root.variant == 3 ? Theme.error
+            : Theme.text;
+        font-size: 12px;
+        font-weight: 600;
+        font-family: Theme.font;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        width: 100%;
+        height: 100%;
+    }
+
+    focus := FocusScope {
+        width: 100%;
+        height: 100%;
+        key-pressed(event) => {
+            if (root.enabled && (event.text == " " || event.text == "\n")) {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+    }
+
+    TouchArea {
+        width: 100%;
+        height: 100%;
+        mouse-cursor: pointer;
+        enabled: root.enabled && !root.busy;
+        clicked => {
+            if (root.enabled && !root.busy) {
+                root.clicked();
+            }
+        }
+    }
+}
+
+export component StatusBadge inherits Rectangle {
+    in property <string> text;
+    in property <int> kind: 0; // 0 neutral, 1 success, 2 warning, 3 error, 4 accent
+    height: 24px;
+    border-radius: 12px;
+    background: kind == 1 ? Theme.success-soft
+        : kind == 2 ? Theme.warning-soft
+        : kind == 3 ? Theme.error-soft
+        : kind == 4 ? Theme.accent-soft
+        : Theme.container;
+    border-width: 1px;
+    border-color: kind == 1 ? #2d4a3c
+        : kind == 2 ? #4b3d25
+        : kind == 3 ? #4a2b2e
+        : kind == 4 ? #403366
+        : Theme.border;
+
+    HorizontalLayout {
+        padding-left: 9px;
+        padding-right: 10px;
+        spacing: 6px;
+        alignment: center;
+        Rectangle {
+            width: 6px;
+            height: 6px;
+            border-radius: 3px;
+            background: kind == 1 ? Theme.success
+                : kind == 2 ? Theme.warning
+                : kind == 3 ? Theme.error
+                : kind == 4 ? Theme.accent-hover
+                : Theme.text-3;
+        }
+        Text {
+            text: root.text;
+            color: kind == 1 ? Theme.success
+                : kind == 2 ? Theme.warning
+                : kind == 3 ? Theme.error
+                : kind == 4 ? #bfa9ff
+                : Theme.text-2;
+            font-size: 11px;
+            font-weight: 500;
+            font-family: Theme.font;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export component NavIcon inherits Rectangle {
+    in property <int> kind: 0;
+    in property <color> tint: Theme.text-3;
+    width: 16px;
+    height: 16px;
+    background: transparent;
+
+    if kind == 0 : VerticalLayout { // overview grid
+        spacing: 3px;
+        HorizontalLayout { spacing: 3px; Rectangle { width: 5px; height: 5px; border-radius: 1px; background: root.tint; } Rectangle { width: 5px; height: 5px; border-radius: 1px; background: root.tint; } }
+        HorizontalLayout { spacing: 3px; Rectangle { width: 5px; height: 5px; border-radius: 1px; background: root.tint; } Rectangle { width: 5px; height: 5px; border-radius: 1px; background: root.tint; } }
+        x: 1px;
+        y: 1px;
+        width: 13px;
+        height: 13px;
+    }
+    if kind == 1 : Path { // globe
+        width: 16px;
+        height: 16px;
+        viewbox-width: 16;
+        viewbox-height: 16;
+        stroke: root.tint;
+        stroke-width: 1.3px;
+        fill: transparent;
+        commands: "M 8 1.5 A 6.5 6.5 0 1 1 7.9 1.5 M 1.5 8 L 14.5 8 M 8 1.5 C 5 4 5 12 8 14.5 C 11 12 11 4 8 1.5";
+    }
+    if kind == 2 : Path { // pulse
+        width: 16px;
+        height: 16px;
+        viewbox-width: 16;
+        viewbox-height: 16;
+        stroke: root.tint;
+        stroke-width: 1.4px;
+        fill: transparent;
+        commands: "M 1 8.5 L 4 8.5 L 6 3.5 L 9 12.5 L 11 6.5 L 15 6.5";
+    }
+    if kind == 3 : VerticalLayout { // log lines
+        spacing: 3px;
+        Rectangle { width: 14px; height: 1.5px; background: root.tint; }
+        Rectangle { width: 11px; height: 1.5px; background: root.tint; }
+        Rectangle { width: 14px; height: 1.5px; background: root.tint; }
+        x: 1px;
+        y: 2px;
+    }
+    if kind == 4 : VerticalLayout { // sliders
+        spacing: 3.5px;
+        HorizontalLayout { spacing: 0px; Rectangle { width: 14px; height: 1.5px; background: root.tint; } Rectangle { width: 4px; height: 4px; border-radius: 2px; background: root.tint; y: -1px; } }
+        HorizontalLayout { spacing: 0px; Rectangle { width: 14px; height: 1.5px; background: root.tint; } Rectangle { width: 4px; height: 4px; border-radius: 2px; background: root.tint; y: -1px; } }
+        HorizontalLayout { spacing: 0px; Rectangle { width: 14px; height: 1.5px; background: root.tint; } Rectangle { width: 4px; height: 4px; border-radius: 2px; background: root.tint; y: -1px; } }
+        x: 1px;
+        y: 2px;
+    }
+}
+
+export component NavItem inherits Rectangle {
+    in property <string> label;
+    in property <int> icon: 0;
+    in property <bool> selected: false;
+    callback clicked;
+
+    height: 36px;
+    width: 100%;
+    border-radius: Theme.radius-sm;
+    background: selected ? Theme.accent-soft : touch.has-hover ? Theme.container : transparent;
+    animate background { duration: 100ms; }
+
+    Rectangle {
+        x: 0px;
+        y: 10px;
+        width: 2px;
+        height: 16px;
+        border-radius: 1px;
+        background: Theme.accent;
+        visible: root.selected;
+    }
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 10px;
+        spacing: 10px;
+        alignment: center;
+        NavIcon { kind: root.icon; tint: root.selected ? #c3b3ff : Theme.text-3; }
+        Text {
+            text: root.label;
+            color: root.selected ? Theme.text : Theme.text-2;
+            font-size: 12.5px;
+            font-weight: root.selected ? 600 : 400;
+            font-family: Theme.font;
+            vertical-alignment: center;
+        }
+    }
+
+    touch := TouchArea {
+
+        width: 100%;
+
+        height: 100%;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+export component ToggleSwitch inherits Rectangle {
+    in-out property <bool> checked: false;
+    callback toggled;
+    width: 38px;
+    height: 21px;
+    border-radius: 11px;
+    background: checked ? Theme.accent : Theme.raised;
+    border-width: 1px;
+    border-color: checked ? #8d6fe0 : Theme.border;
+    animate background { duration: 120ms; }
+
+    Rectangle {
+        x: checked ? 19px : 3px;
+        y: 3px;
+        width: 15px;
+        height: 15px;
+        border-radius: 8px;
+        background: checked ? #ffffff : #b9bccd;
+        animate x { duration: 120ms; }
+    }
+
+    TouchArea {
+
+        width: 100%;
+
+        height: 100%;
+        mouse-cursor: pointer;
+        clicked => {
+            root.checked = !root.checked;
+            root.toggled();
+        }
+    }
+
+    FocusScope {
+        width: 100%;
+        height: 100%;
+        key-pressed(event) => {
+            if (event.text == " ") {
+                root.checked = !root.checked;
+                root.toggled();
+                return accept;
+            }
+            return reject;
+        }
+    }
+}
+
+export component MetricItem inherits VerticalLayout {
+    in property <string> label;
+    in property <string> value;
+    in property <string> unit: "";
+    spacing: 3px;
+    horizontal-stretch: 1;
+    vertical-stretch: 0;
+    alignment: start;
+    Text {
+        text: root.label;
+        color: Theme.text-3;
+        font-size: 11px;
+        font-family: Theme.font;
+    }
+    HorizontalLayout {
+        spacing: 5px;
+        Text {
+            text: root.value;
+            color: Theme.text;
+            font-size: 18px;
+            font-weight: 600;
+            font-family: Theme.font;
+            vertical-alignment: bottom;
+        }
+        Text {
+            text: root.unit;
+            color: Theme.text-3;
+            font-size: 11px;
+            font-family: Theme.font;
+            vertical-alignment: bottom;
+        }
+    }
+}
+
+export component Glyph inherits Rectangle {
+    in property <int> kind: 0;
+    in property <color> tint: Theme.text;
+    width: 16px;
+    height: 16px;
+    background: transparent;
+
+    if kind == 0 : Rectangle { // copy
+        x: 3px; y: 2px; width: 8px; height: 10px; border-radius: 1px; border-width: 1.2px; border-color: root.tint; background: transparent;
+        Rectangle { x: 5px; y: 4px; width: 8px; height: 10px; border-radius: 1px; background: Theme.container; border-width: 1.2px; border-color: root.tint; }
+    }
+    if kind == 1 : Path { // external
+        width: 16px; height: 16px; viewbox-width: 16; viewbox-height: 16;
+        stroke: root.tint; stroke-width: 1.3px; fill: transparent;
+        commands: "M 9 3 L 13 3 L 13 7 M 13 3 L 7 9 M 11 9 L 11 13 L 3 13 L 3 5 L 7 5";
+    }
+    if kind == 2 : Path { // play
+        width: 16px; height: 16px; viewbox-width: 16; viewbox-height: 16;
+        fill: root.tint; stroke: transparent;
+        commands: "M 4 2.5 L 13 8 L 4 13.5 Z";
+    }
+    if kind == 3 : Rectangle { // stop
+        x: 4px; y: 4px; width: 8px; height: 8px; border-radius: 1px; background: root.tint;
+    }
+    if kind == 4 : Path { // refresh
+        width: 16px; height: 16px; viewbox-width: 16; viewbox-height: 16;
+        stroke: root.tint; stroke-width: 1.3px; fill: transparent;
+        commands: "M 13 8 A 5 5 0 1 1 10 3.4 M 13 3 L 13 6 L 10 6";
+    }
+    if kind == 5 : Path { // chevron down
+        width: 16px; height: 16px; viewbox-width: 16; viewbox-height: 16;
+        stroke: root.tint; stroke-width: 1.4px; fill: transparent;
+        commands: "M 4 6 L 8 10 L 12 6";
+    }
+    if kind == 6 : Path { // check
+        width: 16px; height: 16px; viewbox-width: 16; viewbox-height: 16;
+        stroke: root.tint; stroke-width: 1.5px; fill: transparent;
+        commands: "M 3 8 L 6.5 11.5 L 13 4.5";
+    }
+}
+
+export component EndpointField inherits Rectangle {
+    in property <string> label;
+    in property <string> value;
+    in property <string> placeholder: "No public URL yet";
+    in property <bool> mono: true;
+    callback copy-clicked;
+
+    height: 54px;
+    border-radius: Theme.radius-sm;
+    background: Theme.container;
+    border-width: 1px;
+    border-color: Theme.border;
+
+    VerticalLayout {
+        padding-left: 10px;
+        padding-right: 8px;
+        padding-top: 7px;
+        padding-bottom: 6px;
+        spacing: 2px;
+        Text {
+            text: root.label;
+            color: Theme.text-3;
+            font-size: 10px;
+            font-weight: 500;
+            font-family: Theme.font;
+        }
+        HorizontalLayout {
+            spacing: 6px;
+            Text {
+                text: root.value == "" ? root.placeholder : root.value;
+                color: root.value == "" ? Theme.text-3 : Theme.text-2;
+                font-size: root.mono ? 11px : 12px;
+                font-family: root.mono ? Theme.mono : Theme.font;
+                overflow: elide;
+                horizontal-stretch: 1;
+                vertical-alignment: center;
+                height: 22px;
+            }
+            Rectangle {
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                background: copy-touch.has-hover ? Theme.raised : transparent;
+                Glyph { kind: 0; tint: copy-touch.has-hover ? Theme.text : Theme.text-3; width: 13px; height: 13px; x: 5.5px; y: 5.5px; }
+                copy-touch := TouchArea {
+                    width: 100%;
+                    height: 100%;
+                    mouse-cursor: pointer;
+                    clicked => { root.copy-clicked(); }
+                }
+            }
+        }
+    }
+}
+
+export component ProviderCard inherits Rectangle {
+    in property <string> title;
+    in property <string> description;
+    in property <string> badge: "";
+    in property <bool> selected: false;
+    callback clicked;
+
+    height: 96px;
+    border-radius: Theme.radius;
+    background: selected ? Theme.accent-soft : Theme.surface;
+    border-width: 1px;
+    border-color: selected ? #574287 : Theme.border;
+    animate background { duration: 110ms; }
+
+    HorizontalLayout {
+        padding: 14px;
+        spacing: 12px;
+        alignment: start;
+
+        Rectangle {
+            width: 18px;
+            height: 18px;
+            border-radius: 9px;
+            border-width: 1.5px;
+            border-color: selected ? Theme.accent-hover : Theme.text-3;
+            background: transparent;
+            y: 3px;
+            Rectangle {
+                visible: root.selected;
+                width: 8px;
+                height: 8px;
+                border-radius: 4px;
+                background: Theme.accent-hover;
+                x: 3.5px;
+                y: 3.5px;
+            }
+        }
+
+        VerticalLayout {
+            spacing: 4px;
+            horizontal-stretch: 1;
+            HorizontalLayout {
+                spacing: 8px;
+                Text {
+                    text: root.title;
+                    color: Theme.text;
+                    font-size: 13px;
+                    font-weight: 600;
+                    font-family: Theme.font;
+                }
+                if root.badge != "" : StatusBadge { text: root.badge; kind: root.selected ? 4 : 0; height: 20px; }
+            }
+            Text {
+                text: root.description;
+                color: Theme.text-2;
+                font-size: 11.5px;
+                font-family: Theme.font;
+                wrap: word-wrap;
+                height: 34px;
+            }
+        }
+    }
+
+    TouchArea {
+
+        width: 100%;
+
+        height: 100%;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+export component DiagRow inherits Rectangle {
+    width: 100%;
+    in property <string> name;
+    in property <string> detail;
+    in property <string> status;
+    in property <int> state: 0; // 0 unknown, 1 ok, 2 warn, 3 error
+    height: 48px;
+    background: touch.has-hover ? Theme.container : transparent;
+
+    HorizontalLayout {
+        width: 100%;
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 12px;
+        alignment: start;
+        Rectangle {
+            width: 7px;
+            height: 7px;
+            border-radius: 4px;
+            background: state == 1 ? Theme.success : state == 2 ? Theme.warning : state == 3 ? Theme.error : Theme.text-3;
+        }
+        VerticalLayout {
+            spacing: 2px;
+            horizontal-stretch: 1;
+            Text { text: root.name; color: Theme.text; font-size: 12.5px; font-family: Theme.font; horizontal-alignment: left; }
+            Text { text: root.detail; color: Theme.text-3; font-size: 11px; font-family: Theme.font; overflow: elide; horizontal-alignment: left; }
+        }
+        Text {
+            text: root.status;
+            color: state == 1 ? Theme.success : state == 2 ? Theme.warning : state == 3 ? Theme.error : Theme.text-2;
+            font-size: 11px;
+            font-family: Theme.font;
+            horizontal-alignment: right;
+        }
+    }
+
+    Rectangle { x: 14px; y: parent.height - 1px; width: parent.width - 28px; height: 1px; background: Theme.border; opacity: 0.55; }
+    touch := TouchArea { }
+}
+
+export component MirrorRow inherits Rectangle {
+    width: 100%;
+    in property <string> name;
+    in property <string> host;
+    in property <bool> online;
+    height: 38px;
+    HorizontalLayout {
+        width: 100%;
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 10px;
+        alignment: start;
+        Rectangle {
+            width: 6px;
+            height: 6px;
+            border-radius: 3px;
+            background: root.online ? Theme.success : Theme.error;
+        }
+        Text { text: root.name; color: Theme.text; font-size: 12px; font-family: Theme.font; horizontal-stretch: 1; }
+        Text { text: root.host; color: Theme.text-3; font-size: 11px; font-family: Theme.mono; }
+        Text {
+            text: root.online ? "Online" : "Unreachable";
+            color: root.online ? Theme.success : Theme.error;
+            font-size: 10.5px;
+            font-family: Theme.font;
+            width: 82px;
+            horizontal-alignment: right;
+        }
+    }
+}
+
+export component LogLine inherits Rectangle {
+    in property <string> time;
+    in property <string> level;
+    in property <string> message;
+    in property <int> kind: 1; // 0 debug, 1 info, 2 warn, 3 error
+    in property <bool> selected: false;
+    callback clicked;
+    height: 24px;
+    background: selected ? Theme.raised : touch.has-hover ? Theme.container : transparent;
+
+    HorizontalLayout {
+        width: 100%;
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 10px;
+        alignment: start;
+        Text { text: root.time; color: Theme.text-3; font-size: 10.5px; font-family: Theme.mono; width: 64px; }
+        Text {
+            text: root.level;
+            color: kind == 3 ? Theme.error : kind == 2 ? Theme.warning : kind == 0 ? Theme.text-3 : #9a8fc8;
+            font-size: 10px;
+            font-weight: 600;
+            font-family: Theme.font;
+            width: 42px;
+        }
+        Text {
+            text: root.message;
+            color: kind == 3 ? #e6a3a3 : kind == 2 ? #dfc18c : kind == 0 ? Theme.text-3 : Theme.text-2;
+            font-size: 11px;
+            font-family: Theme.mono;
+            horizontal-stretch: 1;
+            overflow: elide;
+            vertical-alignment: center;
+            height: 24px;
+        }
+    }
+
+    touch := TouchArea {
+
+        width: 100%;
+
+        height: 100%;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+export component Toast inherits Rectangle {
+    in property <string> message;
+    in property <int> kind: 0;
+    width: 300px;
+    height: 40px;
+    border-radius: Theme.radius-sm;
+    background: Theme.raised;
+    border-width: 1px;
+    border-color: kind == 3 ? #5a3438 : kind == 2 ? #4b3d25 : Theme.border;
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 8px;
+        alignment: center;
+        Rectangle {
+            width: 6px; height: 6px; border-radius: 3px;
+            background: kind == 3 ? Theme.error : kind == 2 ? Theme.warning : Theme.success;
+        }
+        Text { text: root.message; color: Theme.text; font-size: 11.5px; font-family: Theme.font; vertical-alignment: center; }
+    }
+}
+
+export component Divider inherits Rectangle {
+    height: 1px;
+    background: Theme.border;
+    opacity: 0.7;
+}

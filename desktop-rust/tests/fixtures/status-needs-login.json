@@ -1,0 +1,17 @@
+{
+  "Version": "1.102.4",
+  "BackendState": "NeedsLogin",
+  "AuthURL": "https://login.tailscale.com/a/abc123",
+  "Self": {
+    "DNSName": "",
+    "HostName": "gajar-nouka",
+    "Online": false
+  },
+  "CurrentTailnet": {
+    "Name": "",
+    "MagicDNSEnabled": false
+  },
+  "MagicDNSSuffix": "",
+  "CertDomains": [],
+  "Health": []
+}

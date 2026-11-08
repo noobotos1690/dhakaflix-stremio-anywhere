@@ -68,53 +68,54 @@ Relay is running (pid 4820)
 Paste that URL into Stremio → Addons → Community on **any** device. The URL is
 copied to your clipboard for you.
 
-## Desktop app (Windows, one-click)
+## Desktop app (Windows, Rust + Slint)
 
 Prefer a window over a terminal? Download one of these from the
 [Releases page](https://github.com/noobotos1690/dhakaflix-stremio-anywhere/releases/latest):
 
 | Build | What it does |
 | --- | --- |
-| `DhakaFlixRelay-Setup-1.2.0.exe` | Per-user installer with Start Menu/desktop shortcuts and an uninstaller |
-| `DhakaFlixRelay-Portable-1.2.0.zip` | Unzip anywhere and run `DhakaFlixRelay.exe`; no install |
+| `DhakaFlixRelay-Setup-2.0.0.exe` | Per-user installer with Start Menu/desktop shortcuts and an uninstaller |
+| `DhakaFlixRelay-Portable-2.0.0.zip` | Unzip anywhere and run `DhakaFlixRelay.exe`; no install |
 
-Both need no administrator rights. The dashboard gives you Start/Stop, live
-status, the Stremio install link, realtime logs and a launch-at-Windows-startup
-toggle. On first launch it installs Node.js, the npm packages and `.env`
-locally with a progress bar (admin only if the automatic Node.js download is
-blocked, where it offers a winget install). The first successful start opens
-Stremio so the addon can be added immediately.
+Version 2.0 is a native Rust + Slint shell over the same Node relay. The addon,
+scraper, streaming proxy, Range handling, signed links and both tunnel modes are
+unchanged. Installation needs no administrator rights. On first launch the app
+installs Node.js, npm packages and `.env` locally, and downloads `cloudflared`
+only for Cloudflare mode.
+
+The dashboard has five pages: Overview, Public access, Diagnostics, Logs and
+Settings. It runs from the system tray, can start the relay with Windows, and
+keeps the log file free of `PROXY_SECRET`, tunnel tokens and signed stream paths.
 
 ### Public access: temporary or stable
-
-The addon card has a **Public access** link with two modes:
 
 | Mode | URL | Requirements |
 | --- | --- | --- |
 | **Cloudflare Quick Tunnel** | New `*.trycloudflare.com` hostname every start | `cloudflared` (installed by the app) |
-| **Tailscale Funnel** | Permanent `https://<machine>.<tailnet>.ts.net` | Tailscale app installed and signed in; MagicDNS and HTTPS certificates enabled; Funnel allowed by the tailnet policy |
+| **Tailscale Funnel** | Permanent `https://<machine>.<tailnet>.ts.net` | Tailscale installed and signed in; MagicDNS and HTTPS certificates enabled; Funnel allowed by the tailnet policy |
 
 Tailscale mode works behind CGNAT and needs no port forwarding. Open **Public
 access → Tailscale Funnel**, click **Connect** if needed, then **Enable Funnel**.
 The app starts the relay, enables only its own port-443 Funnel listener, verifies
 `/health` and `/manifest.json` over HTTPS, and shows the stable manifest URL.
-The URL survives relay and Windows restarts while the app keeps running.
+The URL survives relay and Windows restarts.
 
-Two limits are explicit: Funnel hostnames only use Tailscale's `ts.net` domain,
-so a custom domain such as `dhakaflix.dpdns.org` is **not** attached to it; and
-Tailscale applies bandwidth limits to sustained video streaming, so playback
-performance may vary.
+Tailscale Funnel only serves `ts.net` hostnames. A custom domain such as
+`dhakaflix.dpdns.org` cannot be attached to it. Tailscale also applies bandwidth
+limits to sustained video streaming.
 
-Closing the window keeps the relay running in the tray; the app is only
-terminated from the tray icon. In Cloudflare mode, exiting reminds you to remove
-the addon from Stremio because the quick-tunnel URL changes; Tailscale mode
-keeps the same URL.
+Closing the window keeps the relay running in the tray; use the tray menu to
+show the window or exit. The legacy WinForms 1.2 app remains in `desktop/` for
+rollback and is not removed by this release.
 
-![DhakaFlix Relay desktop dashboard](docs/desktop-app.png)
+![DhakaFlix Relay Rust dashboard](desktop-rust/screenshot-rust.png)
 
-Build it with `.\desktop\build.ps1` (needs the .NET SDK, .NET Framework 4.8
-reference assemblies and Inno Setup 6); it also produces the portable zip.
-Details, file locations and troubleshooting: [desktop/README.md](desktop/README.md).
+Build the native shell with `cd desktop-rust; cargo build --release`, then
+`.uild.ps1 -SkipBuild` (needs Rust MSVC and Inno Setup 6). The script also
+produces the portable zip. Details, migration steps and known limits:
+[desktop-rust/README.md](desktop-rust/README.md) and
+[desktop-rust/MIGRATION.md](desktop-rust/MIGRATION.md).
 
 ## Quick start (local / any OS)
 

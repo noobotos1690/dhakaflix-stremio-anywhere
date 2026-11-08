@@ -1,0 +1,1058 @@
+import { Theme } from "theme.slint";
+import { ScrollView, ListView } from "std-widgets.slint";
+import {
+    AppButton, DiagRow, Divider, EndpointField, Glyph, LogLine, MetricItem,
+    MirrorRow, NavItem, Panel, ProviderCard, SectionHeader, StatusBadge, Toast,
+    ToggleSwitch,
+} from "components.slint";
+
+export struct LogRow {
+    seq: int,
+    time: string,
+    level: string,
+    message: string,
+    kind: int,
+}
+
+export struct DiagnosticRow {
+    name: string,
+    detail: string,
+    status: string,
+    state: int,
+}
+
+export struct MirrorRowData {
+    name: string,
+    host: string,
+    online: bool,
+}
+
+component InputField inherits Rectangle {
+    in-out property <string> text;
+    in property <string> placeholder: "";
+    in property <bool> mono: false;
+    in property <bool> enabled: true;
+    callback edited(text: string);
+    callback accepted(text: string);
+
+    height: 32px;
+    border-radius: Theme.radius-sm;
+    background: Theme.container;
+    border-width: 1px;
+    border-color: input.has-focus ? Theme.accent : Theme.border;
+    opacity: enabled ? 1 : 0.5;
+
+    input := TextInput {
+        x: 9px;
+        y: 0px;
+        width: parent.width - 18px;
+        height: 100%;
+        text <=> root.text;
+        enabled: root.enabled;
+        single-line: true;
+        font-size: 12px;
+        font-family: root.mono ? Theme.mono : Theme.font;
+        color: Theme.text;
+        selection-background-color: Theme.accent;
+        selection-foreground-color: #ffffff;
+        vertical-alignment: center;
+        edited => { root.edited(self.text); }
+        accepted => { root.accepted(self.text); }
+    }
+
+    if root.text == "" : Text {
+        x: 9px;
+        y: 0px;
+        width: parent.width - 18px;
+        height: 100%;
+        text: root.placeholder;
+        color: Theme.text-3;
+        font-size: 12px;
+        font-family: root.mono ? Theme.mono : Theme.font;
+        vertical-alignment: center;
+        accessible-role: none;
+    }
+}
+
+export component MainWindow inherits Window {
+    title: "DhakaFlix Relay";
+    width: 1180px;
+    height: 760px;
+    background: Theme.bg;
+
+    in-out property <int> page: 0;
+
+    in-out property <string> status-text: "Stopped";
+    in-out property <int> status-kind: 0;
+    in-out property <string> status-detail: "Relay is not running.";
+    in-out property <bool> relay-running: false;
+    in-out property <bool> busy: false;
+    in-out property <string> busy-text: "";
+
+    in-out property <string> uptime-text: "00:00:00";
+    in-out property <string> node-version: "Not detected";
+    in-out property <string> backend-version: "-";
+    in-out property <int> mirrors-online: 0;
+    in-out property <int> mirrors-total: 0;
+    in-out property <int> active-streams: 0;
+    in-out property <int> max-streams: 8;
+
+    in-out property <string> mode: "cloudflare";
+    in-out property <string> provider-label: "Cloudflare Quick Tunnel";
+    in-out property <bool> temporary-url: true;
+    in-out property <string> public-host: "";
+    in-out property <string> manifest-url: "";
+    in-out property <bool> has-endpoint: false;
+
+    in-out property <string> ts-state: "Not installed";
+    in-out property <int> ts-kind: 0;
+    in-out property <string> ts-detail: "";
+    in-out property <string> ts-device: "-";
+    in-out property <string> ts-host: "-";
+    in-out property <string> ts-funnel: "-";
+    in-out property <string> ts-error: "";
+    in-out property <bool> ts-installed: false;
+    in-out property <bool> ts-connected: false;
+    in-out property <bool> ts-funnel-active: false;
+    in-out property <bool> ts-busy: false;
+
+    in-out property <bool> autostart: false;
+    in-out property <bool> start-on-launch: true;
+    in-out property <bool> minimize-to-tray: true;
+    in-out property <int> port: 7001;
+    in-out property <string> port-text: "7001";
+    in-out property <int> max-streams-setting: 8;
+    in-out property <string> log-level: "info";
+    in-out property <string> default-provider: "cloudflare";
+
+    in-out property <string> log-filter: "all";
+    in-out property <string> log-search: "";
+    in-out property <bool> log-follow: true;
+    in-out property <int> selected-log: -1;
+
+    in-out property <[LogRow]> logs;
+    in-out property <[DiagnosticRow]> diagnostics;
+    in-out property <[MirrorRowData]> mirrors;
+
+    in-out property <bool> toast-visible: false;
+    in-out property <string> toast-message: "";
+    in-out property <int> toast-kind: 0;
+    in-out property <bool> first-run: false;
+    in-out property <string> app-version: "2.0.0";
+
+    callback nav(int);
+    callback start-relay();
+    callback stop-relay();
+    callback restart-relay();
+    callback copy-manifest();
+    callback open-manifest();
+    callback install-stremio();
+    callback choose-provider(string);
+    callback ts-install();
+    callback ts-connect();
+    callback ts-enable();
+    callback ts-disable();
+    callback ts-refresh();
+    callback refresh-diagnostics();
+    callback filter-logs(string);
+    callback search-logs(string);
+    callback log-clear();
+    callback log-copy();
+    callback set-log-follow(bool);
+    callback log-select(int);
+    callback set-autostart(bool);
+    callback set-start-on-launch(bool);
+    callback set-minimize-to-tray(bool);
+    callback port-edited(string);
+    callback set-max-streams(int);
+    callback set-log-level(string);
+    callback open-config();
+    callback open-logs();
+    callback repair();
+    callback reset-prefs();
+    callback dismiss-toast();
+    callback exit-app();
+
+    property <string> page-title:
+        page == 0 ? "Overview" :
+        page == 1 ? "Public access" :
+        page == 2 ? "Diagnostics" :
+        page == 3 ? "Logs" :
+        "Settings";
+
+    property <string> page-subtitle:
+        page == 0 ? "Relay state, endpoint and mirror health." :
+        page == 1 ? "Choose how Stremio reaches this relay." :
+        page == 2 ? "Runtime and network checks." :
+        page == 3 ? "Live backend output." :
+        "Application and relay preferences.";
+
+    HorizontalLayout {
+        spacing: 0px;
+
+        Rectangle {
+            width: 208px;
+            background: Theme.sidebar;
+            border-width: 1px;
+            border-color: Theme.border;
+            border-radius: 0px;
+
+            VerticalLayout {
+                width: 100%;
+                padding-left: 12px;
+                padding-right: 12px;
+                padding-top: 18px;
+                padding-bottom: 14px;
+                spacing: 6px;
+
+                HorizontalLayout {
+                    width: 100%;
+                    padding-left: 6px;
+                    padding-right: 6px;
+                    spacing: 10px;
+                    alignment: start;
+                    height: 42px;
+                    Rectangle {
+                        width: 30px;
+                        height: 30px;
+                        border-radius: 7px;
+                        background: Theme.accent;
+                        Text {
+                            text: "D";
+                            color: #ffffff;
+                            font-size: 16px;
+                            font-weight: 700;
+                            font-family: Theme.font;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                            width: 100%;
+                            height: 100%;
+                        }
+                    }
+                    VerticalLayout {
+                        spacing: 0px;
+                        alignment: center;
+                        Text {
+                            text: "DhakaFlix";
+                            color: Theme.text;
+                            font-size: 13px;
+                            font-weight: 600;
+                            font-family: Theme.font;
+                        }
+                        Text {
+                            text: "Relay";
+                            color: Theme.text-3;
+                            font-size: 10.5px;
+                            font-family: Theme.font;
+                        }
+                    }
+                }
+
+                Rectangle { height: 8px; background: transparent; }
+
+                NavItem { label: "Overview"; icon: 0; selected: page == 0; clicked => { root.nav(0); } }
+                NavItem { label: "Public access"; icon: 1; selected: page == 1; clicked => { root.nav(1); } }
+                NavItem { label: "Diagnostics"; icon: 2; selected: page == 2; clicked => { root.nav(2); } }
+                NavItem { label: "Logs"; icon: 3; selected: page == 3; clicked => { root.nav(3); } }
+                NavItem { label: "Settings"; icon: 4; selected: page == 4; clicked => { root.nav(4); } }
+
+                Rectangle { vertical-stretch: 1; background: transparent; }
+
+                Rectangle {
+                    height: 1px;
+                    background: Theme.border;
+                    opacity: 0.7;
+                }
+                HorizontalLayout {
+                    width: 100%;
+                    padding: 6px;
+                    spacing: 7px;
+                    alignment: start;
+                    Rectangle {
+                        width: 6px;
+                        height: 6px;
+                        border-radius: 3px;
+                        background: relay-running ? Theme.success : Theme.text-3;
+                    }
+                    Text {
+                        text: status-text;
+                        color: Theme.text-2;
+                        font-size: 11px;
+                        font-family: Theme.font;
+                        vertical-alignment: center;
+                    }
+                }
+                Text {
+                    text: "v" + app-version;
+                    color: Theme.text-3;
+                    font-size: 10px;
+                    font-family: Theme.font;
+                    padding-left: 7px;
+                }
+            }
+        }
+
+        Rectangle {
+            horizontal-stretch: 1;
+            background: Theme.bg;
+
+            VerticalLayout {
+                width: 100%;
+                spacing: 0px;
+
+                HorizontalLayout {
+                    width: 100%;
+                    height: 64px;
+                    padding-left: 28px;
+                    padding-right: 28px;
+                    spacing: 12px;
+                    alignment: space-between;
+                    VerticalLayout {
+                        spacing: 1px;
+                        Text {
+                            text: page-title;
+                            color: Theme.text;
+                            font-size: 20px;
+                            font-weight: 600;
+                            font-family: Theme.font;
+                        }
+                        Text {
+                            text: page-subtitle;
+                            color: Theme.text-3;
+                            font-size: 11.5px;
+                            font-family: Theme.font;
+                        }
+                    }
+                    Rectangle { horizontal-stretch: 1; background: transparent; }
+                    if busy : Text {
+                        text: busy-text;
+                        color: Theme.text-2;
+                        font-size: 11px;
+                        font-family: Theme.font;
+                        vertical-alignment: center;
+                    }
+                    StatusBadge { text: status-text; kind: status-kind; }
+                }
+
+                Rectangle { height: 1px; background: Theme.border; opacity: 0.6; }
+
+                if page == 0 : ScrollView {
+                    VerticalLayout {
+                        width: parent.width;
+                        vertical-stretch: 0;
+                        padding: 24px;
+                        spacing: 14px;
+
+                        Panel {
+                            VerticalLayout {
+                                width: 100%;
+                                alignment: start;
+                                padding: 18px;
+                                spacing: 14px;
+                                HorizontalLayout {
+                                    width: 100%;
+                                    spacing: 10px;
+                                    alignment: space-between;
+                                    SectionHeader {
+                                        title: "Service";
+                                        subtitle: "Local relay process and health.";
+                                        horizontal-stretch: 1;
+                                    }
+                                    StatusBadge { text: status-text; kind: status-kind; }
+                                }
+                                HorizontalLayout {
+                                    width: 100%;
+                                    height: 50px;
+                                    alignment: start;
+                                    spacing: 30px;
+                                    MetricItem { label: "Uptime"; value: uptime-text; }
+                                    MetricItem { label: "Node.js"; value: node-version; }
+                                    MetricItem { label: "Mirrors"; value: mirrors-online + " / " + mirrors-total; }
+                                    MetricItem { label: "Streams"; value: active-streams + " / " + max-streams; }
+                                }
+                                Divider { }
+                                HorizontalLayout {
+                                    width: 100%;
+                                    spacing: 8px;
+                                    alignment: start;
+                                    AppButton {
+                                        text: "Start relay";
+                                        variant: 0;
+                                        enabled: !relay-running && !busy;
+                                        clicked => { root.start-relay(); }
+                                    }
+                                    AppButton {
+                                        text: "Stop";
+                                        variant: 1;
+                                        enabled: relay-running && !busy;
+                                        clicked => { root.stop-relay(); }
+                                    }
+                                    AppButton {
+                                        text: "Restart";
+                                        variant: 2;
+                                        enabled: relay-running && !busy;
+                                        clicked => { root.restart-relay(); }
+                                    }
+                                    Rectangle { horizontal-stretch: 1; background: transparent; }
+                                    Text {
+                                        text: status-detail;
+                                        color: Theme.text-3;
+                                        font-size: 11px;
+                                        font-family: Theme.font;
+                                        vertical-alignment: center;
+                                        horizontal-alignment: right;
+                                        overflow: elide;
+                                    }
+                                }
+                            }
+                        }
+
+                        Panel {
+                            VerticalLayout {
+                                width: 100%;
+                                alignment: start;
+                                padding: 18px;
+                                spacing: 12px;
+                                HorizontalLayout {
+                                    width: 100%;
+                                    spacing: 10px;
+                                    alignment: space-between;
+                                    SectionHeader {
+                                        title: "Public endpoint";
+                                        subtitle: "Use this address in Stremio.";
+                                        horizontal-stretch: 1;
+                                    }
+                                    StatusBadge {
+                                        text: provider-label;
+                                        kind: temporary-url ? 2 : 1;
+                                    }
+                                }
+                                EndpointField {
+                                    label: "PUBLIC HOSTNAME";
+                                    value: public-host;
+                                    placeholder: "No public URL yet. Start the relay.";
+                                    copy-clicked => { root.copy-manifest(); }
+                                }
+                                EndpointField {
+                                    label: "STREMIO MANIFEST";
+                                    value: manifest-url;
+                                    placeholder: "The manifest URL appears when the relay is online.";
+                                    copy-clicked => { root.copy-manifest(); }
+                                }
+                                HorizontalLayout {
+                                    width: 100%;
+                                    spacing: 8px;
+                                    AppButton {
+                                        text: "Copy link";
+                                        variant: 0;
+                                        enabled: has-endpoint;
+                                        clicked => { root.copy-manifest(); }
+                                    }
+                                    AppButton {
+                                        text: "Open page";
+                                        variant: 1;
+                                        enabled: has-endpoint;
+                                        clicked => { root.open-manifest(); }
+                                    }
+                                    AppButton {
+                                        text: "Install in Stremio";
+                                        variant: 1;
+                                        enabled: has-endpoint;
+                                        clicked => { root.install-stremio(); }
+                                    }
+                                    Rectangle { horizontal-stretch: 1; background: transparent; }
+                                    Text {
+                                        text: temporary-url ? "Temporary URL. It changes when the relay restarts." : "Stable URL. It survives restarts.";
+                                        color: temporary-url ? Theme.warning : Theme.success;
+                                        font-size: 10.5px;
+                                        font-family: Theme.font;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+
+                        Panel {
+                            VerticalLayout {
+                                width: 100%;
+                                alignment: start;
+                                padding-top: 16px;
+                                padding-bottom: 8px;
+                                spacing: 0px;
+                                HorizontalLayout {
+                                    width: 100%;
+                                    padding-left: 16px;
+                                    padding-right: 16px;
+                                    padding-bottom: 8px;
+                                    SectionHeader {
+                                        title: "BDIX mirrors";
+                                        subtitle: "Reachability from this PC.";
+                                        horizontal-stretch: 1;
+                                    }
+                                    Text {
+                                        text: mirrors-online + " of " + mirrors-total + " online";
+                                        color: Theme.text-3;
+                                        font-size: 11px;
+                                        font-family: Theme.font;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                                if mirrors.length == 0 : Text {
+                                    text: "No mirror data yet. Start the relay.";
+                                    color: Theme.text-3;
+                                    font-size: 11px;
+                                    font-family: Theme.font;
+                                    padding-left: 16px;
+                                    padding-bottom: 12px;
+                                }
+                                for mirror in mirrors : MirrorRow {
+                                    name: mirror.name;
+                                    host: mirror.host;
+                                    online: mirror.online;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if page == 1 : ScrollView {
+                    VerticalLayout {
+                        width: parent.width;
+                        vertical-stretch: 0;
+                        padding: 24px;
+                        spacing: 14px;
+
+                        Text {
+                            height: 20px;
+                            text: "Pick one public transport. Only the selected provider is started with the relay.";
+                            color: Theme.text-3;
+                            font-size: 11.5px;
+                            font-family: Theme.font;
+                        }
+
+                        HorizontalLayout {
+                            spacing: 12px;
+                            ProviderCard {
+                                title: "Cloudflare Quick Tunnel";
+                                description: "Temporary trycloudflare.com hostname. No account, no domain.";
+                                badge: mode == "cloudflare" ? "Active" : "";
+                                selected: mode == "cloudflare";
+                                horizontal-stretch: 1;
+                                clicked => { root.choose-provider("cloudflare"); }
+                            }
+                            ProviderCard {
+                                title: "Tailscale Funnel";
+                                description: "Permanent ts.net HTTPS URL. Works behind CGNAT.";
+                                badge: mode == "tailscale" ? "Active" : "";
+                                selected: mode == "tailscale";
+                                horizontal-stretch: 1;
+                                clicked => { root.choose-provider("tailscale"); }
+                            }
+                        }
+
+                        if mode == "cloudflare" : Panel {
+                            height: 232px;
+                            VerticalLayout {
+                                width: 100%;
+                                alignment: start;
+                                padding: 18px;
+                                spacing: 12px;
+                                SectionHeader {
+                                    title: "Cloudflare Quick Tunnel";
+                                    subtitle: "Starts cloudflared with the relay. The URL changes on every start.";
+                                }
+                                HorizontalLayout {
+                                    width: 100%;
+                                    spacing: 12px;
+                                    EndpointField {
+                                        label: "CURRENT HOSTNAME";
+                                        value: public-host;
+                                        placeholder: "Start the relay to get a URL";
+                                        horizontal-stretch: 1;
+                                        copy-clicked => { root.copy-manifest(); }
+                                    }
+                                    EndpointField {
+                                        label: "MANIFEST";
+                                        value: manifest-url;
+                                        placeholder: "Not available";
+                                        horizontal-stretch: 1;
+                                        copy-clicked => { root.copy-manifest(); }
+                                    }
+                                }
+                                Text {
+                                    text: "cloudflared is installed into the app folder on first setup. No Cloudflare account is used.";
+                                    color: Theme.text-3;
+                                    font-size: 11px;
+                                    font-family: Theme.font;
+                                    wrap: word-wrap;
+                                }
+                                HorizontalLayout {
+                                    width: 100%;
+                                    spacing: 8px;
+                                    AppButton {
+                                        text: "Copy manifest";
+                                        variant: 1;
+                                        enabled: has-endpoint;
+                                        clicked => { root.copy-manifest(); }
+                                    }
+                                    AppButton {
+                                        text: relay-running ? "Stop relay" : "Start relay";
+                                        variant: relay-running ? 1 : 0;
+                                        enabled: !busy;
+                                        clicked => { if relay-running { root.stop-relay(); } else { root.start-relay(); } }
+                                    }
+                                }
+                            }
+                        }
+
+                        if mode == "tailscale" : Panel {
+                            height: 392px;
+                            VerticalLayout {
+                                width: 100%;
+                                alignment: start;
+                                padding: 18px;
+                                spacing: 12px;
+                                HorizontalLayout {
+                                    width: 100%;
+                                    spacing: 10px;
+                                    alignment: space-between;
+                                    SectionHeader {
+                                        title: "Tailscale Funnel";
+                                        subtitle: "Stable HTTPS address on your tailnet.";
+                                        horizontal-stretch: 1;
+                                    }
+                                    StatusBadge { text: ts-state; kind: ts-kind; }
+                                }
+
+                                Rectangle {
+                                    background: Theme.container;
+                                    border-radius: Theme.radius-sm;
+                                    border-width: 1px;
+                                    border-color: Theme.border;
+                                    VerticalLayout {
+                                        padding: 12px;
+                                        spacing: 8px;
+                                        HorizontalLayout {
+                                            width: 100%;
+                                            spacing: 10px;
+                                            Text { text: "Connection"; color: Theme.text-3; font-size: 11px; width: 120px; }
+                                            Text { text: ts-connected ? "Connected" : (ts-installed ? "Not connected" : "Tailscale not installed"); color: ts-connected ? Theme.success : Theme.warning; font-size: 11.5px; horizontal-stretch: 1; }
+                                        }
+                                        HorizontalLayout {
+                                            width: 100%;
+                                            spacing: 10px;
+                                            Text { text: "Device"; color: Theme.text-3; font-size: 11px; width: 120px; }
+                                            Text { text: ts-device; color: Theme.text-2; font-size: 11.5px; horizontal-stretch: 1; overflow: elide; }
+                                        }
+                                        HorizontalLayout {
+                                            width: 100%;
+                                            spacing: 10px;
+                                            Text { text: "Tailnet host"; color: Theme.text-3; font-size: 11px; width: 120px; }
+                                            Text { text: ts-host; color: Theme.text-2; font-size: 11.5px; horizontal-stretch: 1; overflow: elide; }
+                                        }
+                                        HorizontalLayout {
+                                            width: 100%;
+                                            spacing: 10px;
+                                            Text { text: "Funnel"; color: Theme.text-3; font-size: 11px; width: 120px; }
+                                            Text { text: ts-funnel; color: ts-funnel-active ? Theme.success : Theme.text-2; font-size: 11.5px; horizontal-stretch: 1; }
+                                        }
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    width: 100%;
+                                    spacing: 8px;
+                                    AppButton {
+                                        text: "Install Tailscale";
+                                        variant: 1;
+                                        enabled: !ts-installed && !ts-busy;
+                                        clicked => { root.ts-install(); }
+                                    }
+                                    AppButton {
+                                        text: "Connect";
+                                        variant: 1;
+                                        enabled: ts-installed && !ts-connected && !ts-busy;
+                                        clicked => { root.ts-connect(); }
+                                    }
+                                    AppButton {
+                                        text: "Enable Funnel";
+                                        variant: 0;
+                                        enabled: ts-connected && !ts-funnel-active && !ts-busy;
+                                        clicked => { root.ts-enable(); }
+                                    }
+                                    AppButton {
+                                        text: "Disable";
+                                        variant: 2;
+                                        enabled: ts-funnel-active && !ts-busy;
+                                        clicked => { root.ts-disable(); }
+                                    }
+                                    AppButton {
+                                        text: "Refresh";
+                                        variant: 2;
+                                        enabled: !ts-busy;
+                                        clicked => { root.ts-refresh(); }
+                                    }
+                                }
+
+                                HorizontalLayout {
+
+                                    width: 100%;
+                                    spacing: 12px;
+                                    EndpointField {
+                                        label: "PUBLIC HTTPS ADDRESS";
+                                        value: ts-host;
+                                        placeholder: "Enable Funnel to get an address";
+                                        horizontal-stretch: 1;
+                                        copy-clicked => { root.copy-manifest(); }
+                                    }
+                                    EndpointField {
+                                        label: "MANIFEST";
+                                        value: manifest-url;
+                                        placeholder: "Not available";
+                                        horizontal-stretch: 1;
+                                        copy-clicked => { root.copy-manifest(); }
+                                    }
+                                }
+
+                                if ts-error != "" : Text {
+                                    text: ts-error;
+                                    color: Theme.error;
+                                    font-size: 11px;
+                                    font-family: Theme.font;
+                                    wrap: word-wrap;
+                                }
+                                if ts-detail != "" : Text {
+                                    text: ts-detail;
+                                    color: Theme.text-3;
+                                    font-size: 11px;
+                                    font-family: Theme.font;
+                                    wrap: word-wrap;
+                                }
+
+                                Text {
+                                    text: "Funnel needs MagicDNS and HTTPS certificates on the tailnet. It provides a ts.net name, not a custom domain. Bandwidth limits may affect sustained video playback.";
+                                    color: Theme.text-3;
+                                    font-size: 10.5px;
+                                    font-family: Theme.font;
+                                    wrap: word-wrap;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if page == 2 : ScrollView {
+                    VerticalLayout {
+                        width: parent.width;
+                        vertical-stretch: 0;
+                        padding: 24px;
+                        spacing: 14px;
+                        Panel {
+                            VerticalLayout {
+                                width: 100%;
+                                alignment: start;
+                                padding-top: 16px;
+                                padding-bottom: 10px;
+                                spacing: 0px;
+                                HorizontalLayout {
+                                    width: 100%;
+                                    padding-left: 16px;
+                                    padding-right: 16px;
+                                    padding-bottom: 10px;
+                                    SectionHeader {
+                                        title: "Runtime and network";
+                                        subtitle: "Checked on request, not cached claims.";
+                                        horizontal-stretch: 1;
+                                    }
+                                    AppButton {
+                                        text: "Refresh diagnostics";
+                                        width: 154px;
+                                        variant: 1;
+                                        enabled: !busy;
+                                        clicked => { root.refresh-diagnostics(); }
+                                    }
+                                }
+                                for row in diagnostics : DiagRow {
+                                    name: row.name;
+                                    detail: row.detail;
+                                    status: row.status;
+                                    state: row.state;
+                                }
+                            }
+                        }
+
+                        Panel {
+                            VerticalLayout {
+                                width: 100%;
+                                alignment: start;
+                                padding-top: 16px;
+                                padding-bottom: 8px;
+                                spacing: 0px;
+                                HorizontalLayout {
+                                    width: 100%;
+                                    padding-left: 16px;
+                                    padding-right: 16px;
+                                    padding-bottom: 8px;
+                                    SectionHeader {
+                                        title: "BDIX mirrors";
+                                        subtitle: "Provider reachability.";
+                                        horizontal-stretch: 1;
+                                    }
+                                }
+                                if mirrors.length == 0 : Text {
+                                    text: "No mirror data. Start the relay and refresh.";
+                                    color: Theme.text-3;
+                                    font-size: 11px;
+                                    font-family: Theme.font;
+                                    padding-left: 16px;
+                                    padding-bottom: 12px;
+                                }
+                                for mirror in mirrors : MirrorRow {
+                                    name: mirror.name;
+                                    host: mirror.host;
+                                    online: mirror.online;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if page == 3 : Rectangle {
+                    VerticalLayout {
+                        width: 100%;
+                        vertical-stretch: 0;
+                        padding: 24px;
+                        spacing: 12px;
+
+                        Panel {
+                            VerticalLayout {
+                                width: 100%;
+                                alignment: start;
+                                padding: 12px;
+                                spacing: 8px;
+                                HorizontalLayout {
+                                    width: 100%;
+                                    spacing: 6px;
+                                    alignment: start;
+                                    Text { text: "Level"; color: Theme.text-3; font-size: 11px; font-family: Theme.font; vertical-alignment: center; }
+                                    AppButton { text: "All"; variant: log-filter == "all" ? 0 : 2; height: 28px; width: 48px; clicked => { root.filter-logs("all"); } }
+                                    AppButton { text: "Info"; variant: log-filter == "info" ? 0 : 2; height: 28px; width: 48px; clicked => { root.filter-logs("info"); } }
+                                    AppButton { text: "Warn"; variant: log-filter == "warn" ? 0 : 2; height: 28px; width: 52px; clicked => { root.filter-logs("warn"); } }
+                                    AppButton { text: "Error"; variant: log-filter == "error" ? 0 : 2; height: 28px; width: 52px; clicked => { root.filter-logs("error"); } }
+                                    Rectangle { width: 10px; background: transparent; }
+                                    InputField {
+                                        placeholder: "Search logs";
+                                        text: log-search;
+                                        width: 210px;
+                                        edited(text) => { root.search-logs(text); }
+                                    }
+                                    Rectangle { horizontal-stretch: 1; background: transparent; }
+                                    Text { text: "Follow"; color: Theme.text-3; font-size: 11px; font-family: Theme.font; vertical-alignment: center; }
+                                    ToggleSwitch {
+                                        checked: log-follow;
+                                        toggled => { root.log-follow = !root.log-follow; root.set-log-follow(root.log-follow); }
+                                    }
+                                    AppButton { text: "Clear"; variant: 2; height: 28px; width: 56px; clicked => { root.log-clear(); } }
+                                    AppButton { text: "Copy"; variant: 2; height: 28px; width: 56px; clicked => { root.log-copy(); } }
+                                }
+                            }
+                        }
+
+                        Panel {
+                            vertical-stretch: 1;
+                            VerticalLayout {
+                                width: 100%;
+                                alignment: start;
+                                spacing: 0px;
+                                if logs.length == 0 : Text {
+                                    text: "No log output yet.";
+                                    color: Theme.text-3;
+                                    font-size: 11px;
+                                    font-family: Theme.font;
+                                    padding: 16px;
+                                }
+                                ListView {
+                                    for log in logs : LogLine {
+                                        time: log.time;
+                                        level: log.level;
+                                        message: log.message;
+                                        kind: log.kind;
+                                        selected: selected-log == log.seq;
+                                        clicked => { root.log-select(log.seq); }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if page == 4 : ScrollView {
+                    VerticalLayout {
+                        width: parent.width;
+                        vertical-stretch: 0;
+                        padding: 24px;
+                        spacing: 14px;
+
+                        Panel {
+                            VerticalLayout {
+                                width: 100%;
+                                alignment: start;
+                                padding: 18px;
+                                spacing: 10px;
+                                SectionHeader {
+                                    title: "Startup";
+                                    subtitle: "Windows and tray behaviour.";
+                                }
+                                HorizontalLayout {
+                                    width: 100%;
+                                    spacing: 12px;
+                                    alignment: start;
+                                    VerticalLayout {
+                                        spacing: 2px;
+                                        horizontal-stretch: 1;
+                                        Text { text: "Launch at Windows startup"; color: Theme.text; font-size: 12px; font-family: Theme.font; }
+                                        Text { text: "Starts hidden in the notification area."; color: Theme.text-3; font-size: 10.5px; font-family: Theme.font; }
+                                    }
+                                    ToggleSwitch {
+                                        checked: autostart;
+                                        toggled => { root.set-autostart(!root.autostart); }
+                                    }
+                                }
+                                HorizontalLayout {
+                                    width: 100%;
+                                    spacing: 12px;
+                                    alignment: start;
+                                    VerticalLayout {
+                                        spacing: 2px;
+                                        horizontal-stretch: 1;
+                                        Text { text: "Start relay when the application opens"; color: Theme.text; font-size: 12px; font-family: Theme.font; }
+                                        Text { text: "Keeps the addon online after a restart."; color: Theme.text-3; font-size: 10.5px; font-family: Theme.font; }
+                                    }
+                                    ToggleSwitch {
+                                        checked: start-on-launch;
+                                        toggled => { root.set-start-on-launch(!root.start-on-launch); }
+                                    }
+                                }
+                                HorizontalLayout {
+                                    width: 100%;
+                                    spacing: 12px;
+                                    alignment: start;
+                                    VerticalLayout {
+                                        spacing: 2px;
+                                        horizontal-stretch: 1;
+                                        Text { text: "Minimise to system tray"; color: Theme.text; font-size: 12px; font-family: Theme.font; }
+                                        Text { text: "Closing the window keeps the relay running."; color: Theme.text-3; font-size: 10.5px; font-family: Theme.font; }
+                                    }
+                                    ToggleSwitch {
+                                        checked: minimize-to-tray;
+                                        toggled => { root.set-minimize-to-tray(!root.minimize-to-tray); }
+                                    }
+                                }
+                            }
+                        }
+
+                        Panel {
+                            VerticalLayout {
+                                width: 100%;
+                                alignment: start;
+                                padding: 18px;
+                                spacing: 12px;
+                                SectionHeader {
+                                    title: "Relay";
+                                    subtitle: "Local server and stream limits.";
+                                }
+                                HorizontalLayout {
+                                    width: 100%;
+                                    spacing: 12px;
+                                    alignment: start;
+                                    Text { text: "Relay port"; color: Theme.text; font-size: 12px; font-family: Theme.font; width: 190px; }
+                                    InputField {
+                                        text: port-text;
+                                        placeholder: "7001";
+                                        width: 96px;
+                                        accepted(text) => { root.port-edited(text); }
+                                    }
+                                    Text { text: "Changes apply on the next start."; color: Theme.text-3; font-size: 10.5px; font-family: Theme.font; horizontal-stretch: 1; }
+                                }
+                                HorizontalLayout {
+                                    width: 100%;
+                                    spacing: 12px;
+                                    alignment: start;
+                                    Text { text: "Maximum concurrent streams"; color: Theme.text; font-size: 12px; font-family: Theme.font; width: 190px; }
+                                    AppButton {
+                                        text: "-";
+                                        variant: 1;
+                                        width: 32px;
+                                        enabled: max-streams-setting > 1;
+                                        clicked => { root.set-max-streams(max-streams-setting - 1); }
+                                    }
+                                    Text { text: max-streams-setting; color: Theme.text; font-size: 12px; font-family: Theme.font; width: 26px; horizontal-alignment: start; }
+                                    AppButton {
+                                        text: "+";
+                                        variant: 1;
+                                        width: 32px;
+                                        enabled: max-streams-setting < 64;
+                                        clicked => { root.set-max-streams(max-streams-setting + 1); }
+                                    }
+                                }
+                                HorizontalLayout {
+                                    width: 100%;
+                                    spacing: 12px;
+                                    alignment: start;
+                                    Text { text: "Log level"; color: Theme.text; font-size: 12px; font-family: Theme.font; width: 190px; }
+                                    AppButton { text: "Error"; variant: log-level == "error" ? 0 : 2; height: 28px; width: 58px; clicked => { root.set-log-level("error"); } }
+                                    AppButton { text: "Warn"; variant: log-level == "warn" ? 0 : 2; height: 28px; width: 58px; clicked => { root.set-log-level("warn"); } }
+                                    AppButton { text: "Info"; variant: log-level == "info" ? 0 : 2; height: 28px; width: 58px; clicked => { root.set-log-level("info"); } }
+                                    AppButton { text: "Debug"; variant: log-level == "debug" ? 0 : 2; height: 28px; width: 58px; clicked => { root.set-log-level("debug"); } }
+                                }
+                                HorizontalLayout {
+                                    width: 100%;
+                                    spacing: 12px;
+                                    alignment: start;
+                                    Text { text: "Default public access"; color: Theme.text; font-size: 12px; font-family: Theme.font; width: 190px; }
+                                    AppButton { text: "Cloudflare"; variant: default-provider == "cloudflare" ? 0 : 2; height: 28px; width: 92px; clicked => { root.choose-provider("cloudflare"); } }
+                                    AppButton { text: "Tailscale"; variant: default-provider == "tailscale" ? 0 : 2; height: 28px; width: 92px; clicked => { root.choose-provider("tailscale"); } }
+                                }
+                            }
+                        }
+
+                        Panel {
+                            VerticalLayout {
+                                width: 100%;
+                                alignment: start;
+                                padding: 18px;
+                                spacing: 10px;
+                                SectionHeader {
+                                    title: "Maintenance";
+                                    subtitle: "Files, dependencies and preferences.";
+                                }
+                                HorizontalLayout {
+                                    width: 100%;
+                                    spacing: 8px;
+                                    AppButton { text: "Open config folder"; variant: 1; clicked => { root.open-config(); } }
+                                    AppButton { text: "Open log folder"; variant: 1; clicked => { root.open-logs(); } }
+                                    AppButton { text: "Repair dependencies"; variant: 1; clicked => { root.repair(); } }
+                                    AppButton { text: "Reset preferences"; variant: 3; clicked => { root.reset-prefs(); } }
+                                }
+                                Text {
+                                    text: "Reset removes interface preferences only. .env, PROXY_SECRET and Tailscale settings are kept.";
+                                    color: Theme.text-3;
+                                    font-size: 10.5px;
+                                    font-family: Theme.font;
+                                    wrap: word-wrap;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if toast-visible : Toast {
+        x: root.width - self.width - 24px;
+        y: root.height - self.height - 24px;
+        message: toast-message;
+        kind: toast-kind;
+    }
+}

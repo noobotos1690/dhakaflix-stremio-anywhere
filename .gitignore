@@ -21,3 +21,11 @@ desktop/install-final/
 desktop/quittest/
 desktop/stremiotest/
 desktop/tests/bin/
+
+# Rust desktop build output and scratch logs
+desktop-rust/target/
+desktop-rust/dist/
+desktop-rust/*.log
+desktop-rust/check.log
+desktop-rust/release-build.log
+desktop-rust/test.log

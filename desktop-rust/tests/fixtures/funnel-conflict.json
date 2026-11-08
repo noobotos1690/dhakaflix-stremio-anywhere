@@ -1,0 +1,11 @@
+{
+  "Web": {
+    "gajar-nouka.tail145eb3.ts.net:443": {
+      "Handlers": {
+        "/": {
+          "Proxy": "http://127.0.0.1:9000"
+        }
+      }
+    }
+  }
+}

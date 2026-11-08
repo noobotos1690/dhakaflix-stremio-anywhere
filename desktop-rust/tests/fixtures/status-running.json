@@ -1,0 +1,17 @@
+{
+  "Version": "1.102.4",
+  "BackendState": "Running",
+  "AuthURL": "",
+  "Self": {
+    "DNSName": "gajar-nouka.tail145eb3.ts.net.",
+    "HostName": "gajar-nouka",
+    "Online": true
+  },
+  "CurrentTailnet": {
+    "Name": "tail145eb3.ts.net",
+    "MagicDNSEnabled": true
+  },
+  "MagicDNSSuffix": "tail145eb3.ts.net",
+  "CertDomains": ["gajar-nouka.tail145eb3.ts.net"],
+  "Health": []
+}
