@@ -607,6 +607,45 @@ namespace DhakaFlixRelay
         }
     }
 
+    /// <summary>Radio-style selection dot used by the public access dialog.</summary>
+    internal sealed class RadioDot : Control
+    {
+        private bool _selected;
+
+        public bool Selected
+        {
+            get { return _selected; }
+            set { if (_selected != value) { _selected = value; Invalidate(); } }
+        }
+
+        public RadioDot()
+        {
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
+                     ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+            Size = new Size(20, 20);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.Clear(Parent != null ? Parent.BackColor : Theme.Card);
+
+            var outer = new RectangleF(1f, 1f, Width - 2f, Height - 2f);
+            using (var pen = new Pen(_selected ? Theme.Accent : Theme.Border, _selected ? 2f : 1.4f))
+            {
+                g.DrawEllipse(pen, outer);
+            }
+            if (_selected)
+            {
+                using (var brush = new SolidBrush(Theme.Accent))
+                {
+                    g.FillEllipse(brush, 5.5f, 5.5f, Width - 11f, Height - 11f);
+                }
+            }
+        }
+    }
+
     /// <summary>App mark: indigo gradient tile, play glyph, green status dot.</summary>
     internal sealed class BrandMark : Control
     {

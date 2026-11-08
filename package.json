@@ -1,6 +1,6 @@
 {
   "name": "dflix-series-streamio-addon",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "DhakaFlix (BDIX) addon for Stremio with a public relay",
   "main": "index.js",
   "engines": {

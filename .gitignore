@@ -20,3 +20,4 @@ desktop/*.png
 desktop/install-final/
 desktop/quittest/
 desktop/stremiotest/
+desktop/tests/bin/

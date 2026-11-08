@@ -25,6 +25,7 @@ namespace DhakaFlixRelay
         private readonly AppSettings _settings;
         private readonly RelayController _relay;
         private readonly DependencyManager _deps;
+        private readonly TailscaleManager _tailscale;
         private readonly bool _autostart;
         private float _scale;
 
@@ -92,6 +93,7 @@ namespace DhakaFlixRelay
         private AppButton _installButton;
         private AppButton _copyButton;
         private AppButton _openButton;
+        private AppButton _accessLink;
         private Label _urlHint;
 
         private Card _logsCard;
@@ -127,7 +129,8 @@ namespace DhakaFlixRelay
             _settings = AppSettings.Load();
             _scale = GetInitialScale();
 
-            _relay = new RelayController(paths, _settings, (text, level) => PostLog(level, text));
+            _tailscale = new TailscaleManager();
+            _relay = new RelayController(paths, _settings, _tailscale, (text, level) => PostLog(level, text));
             _deps = new DependencyManager(paths, (text, level) => PostLog(level, text));
 
             BuildWindow();
@@ -312,7 +315,7 @@ namespace DhakaFlixRelay
 
             _setupButton = MakeButton("Install dependencies", ButtonKind.Primary, null);
             _setupButton.Backplate = _banner.FillColor;
-            _setupButton.Click += (s, e) => BeginSetup(true);
+            _setupButton.Click += (s, e) => OnSetupButtonClicked();
             _banner.Controls.Add(_setupButton);
 
             _progress = new ThinProgress { Visible = false };
@@ -516,6 +519,12 @@ namespace DhakaFlixRelay
                 "In Stremio: Addons, then Install from URL. Quick-tunnel links change when the relay restarts.",
                 Theme.FontSmall, Theme.TextDim);
             _installCard.Controls.Add(_urlHint);
+
+            _accessLink = MakeButton("Public access: Cloudflare Quick Tunnel", ButtonKind.Link, Icons.Globe);
+            _accessLink.Font = Theme.FontSmall;
+            _accessLink.Backplate = Theme.Card;
+            _accessLink.Click += (s, e) => OpenPublicAccess();
+            _installCard.Controls.Add(_accessLink);
         }
 
         private void BuildLogCard()
@@ -714,7 +723,7 @@ namespace DhakaFlixRelay
 
             int rightX = pad + leftW + gutter;
             int rightW = width - pad - rightX;
-            int installH = S(202);
+            int installH = S(226);
             _installCard.SetBounds(rightX, mainTop, rightW, installH);
             LayoutInstallCard(0, 0, rightW, installH);
 
@@ -790,7 +799,8 @@ namespace DhakaFlixRelay
             _copyButton.SetBounds(x + pad + installW + S(8), buttonTop, copyW, S(42));
             _openButton.SetBounds(x + pad + installW + copyW + S(16), buttonTop, openW, S(42));
 
-            _urlHint.SetBounds(x + pad, y + S(150), innerW, S(36));
+            _urlHint.SetBounds(x + pad, y + S(148), innerW, S(34));
+            _accessLink.SetBounds(x + pad, y + S(188), innerW, S(24));
         }
 
         private void LayoutLogsCard(int x, int y, int w, int h)
@@ -832,7 +842,7 @@ namespace DhakaFlixRelay
             if (!_adminLink.Visible) _repairLink.SetBounds(_adminLink.Left, _adminLink.Top, S(160), S(22));
 
             _urlBox.Text = LinkPlaceholder;
-            _urlHint.Text = "In Stremio: Addons, then Install from URL. Quick-tunnel links change when the relay restarts.";
+            UpdateAccessLink();
             OpenLogFile();
             AppendLocalLog(LogLevel.Info, "Desktop started. Relay folder: " + _paths.Root);
 
@@ -858,7 +868,7 @@ namespace DhakaFlixRelay
         {
             try
             {
-                DependencySnapshot snapshot = await Task.Run(() => _deps.Inspect());
+                DependencySnapshot snapshot = await Task.Run(() => _deps.Inspect(_settings.GetMode()));
                 _snapshot = snapshot;
                 ApplySetupState();
             }
@@ -885,6 +895,22 @@ namespace DhakaFlixRelay
                     _autoStartPending = false;
                     StartRelay();
                 }
+                return;
+            }
+
+            PublicAccessMode mode = _settings.GetMode();
+            if (!_installing && mode == PublicAccessMode.Tailscale && !_snapshot.TailscaleOk)
+            {
+                _banner.Visible = true;
+                SetBannerPalette(false);
+                _bannerTitle.Text = "Install Tailscale to use a stable URL";
+                _bannerDetail.Text = "Tailscale is not installed. Cloudflared is not needed in this mode.";
+                _bannerPercent.Text = string.Empty;
+                _setupButton.Text = "Install Tailscale";
+                _setupButton.Enabled = true;
+                _progress.Visible = false;
+                _statusTitle.ForeColor = Theme.Text;
+                LayoutAll();
                 return;
             }
 
@@ -975,6 +1001,16 @@ namespace DhakaFlixRelay
             {
                 await _relay.StartAsync();
                 _healthTimer.Start();
+            }
+            catch (TailscaleException ex)
+            {
+                AppendLocalLog(LogLevel.Error, ex.Message);
+                _statusDetail.Text = ex.Message;
+                DialogResult answer = MessageBox.Show(this,
+                    ex.Message + Environment.NewLine + Environment.NewLine +
+                    "Open Public access to connect Tailscale or fix Funnel?",
+                    "Tailscale", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (answer == DialogResult.Yes) OpenPublicAccess();
             }
             catch (Exception ex)
             {
@@ -1127,9 +1163,11 @@ namespace DhakaFlixRelay
             _installButton.Invalidate();
             _copyButton.Enabled = true;
             _openButton.Enabled = true;
-            _urlHint.Text = manifest.IndexOf("trycloudflare.com", StringComparison.OrdinalIgnoreCase) >= 0
-                ? "Quick tunnel link - it changes every time the relay restarts. Use a named tunnel for a permanent URL."
-                : "Local link - works in Stremio on this PC. Public tunnel was unavailable.";
+            _urlHint.Text = _settings.GetMode() == PublicAccessMode.Tailscale
+                ? "Stable Tailscale URL - it stays the same after every restart."
+                : (manifest.IndexOf("trycloudflare.com", StringComparison.OrdinalIgnoreCase) >= 0
+                    ? "Quick tunnel link - it changes every time the relay restarts. Use Tailscale Funnel for a permanent URL."
+                    : "Local link - works in Stremio on this PC. Public tunnel was unavailable.");
             RefreshTrayState();
             MaybePromoteFirstInstall();
         }
@@ -1145,7 +1183,9 @@ namespace DhakaFlixRelay
             _installButton.Invalidate();
             _copyButton.Enabled = false;
             _openButton.Enabled = false;
-            _urlHint.Text = "In Stremio: Addons, then Install from URL. Quick-tunnel links change when the relay restarts.";
+            _urlHint.Text = _settings.GetMode() == PublicAccessMode.Tailscale
+                ? "Stable Tailscale URL - it stays the same after every restart."
+                : "In Stremio: Addons, then Install from URL. Quick-tunnel links change when the relay restarts.";
             RefreshTrayState();
         }
 
@@ -1268,7 +1308,7 @@ namespace DhakaFlixRelay
             UpdateStartButton();
 
             var progress = new Progress<SetupProgress>(OnSetupProgress);
-            bool ok = await _deps.InstallAsync(progress, CancellationToken.None);
+            bool ok = await _deps.InstallAsync(progress, _settings.GetMode(), CancellationToken.None);
 
             _installing = false;
             await RefreshDependenciesAsync();
@@ -1336,7 +1376,7 @@ namespace DhakaFlixRelay
         {
             try
             {
-                _snapshot = await Task.Run(() => _deps.Inspect());
+                _snapshot = await Task.Run(() => _deps.Inspect(_settings.GetMode()));
                 ApplySetupState();
             }
             catch (Exception ex)
@@ -1344,6 +1384,153 @@ namespace DhakaFlixRelay
                 AppendLocalLog(LogLevel.Error, "Dependency check failed: " + ex.Message);
             }
         }
+
+        // ------------------------------------------------------------ public access
+
+        private void OnSetupButtonClicked()
+        {
+            if (_settings.GetMode() == PublicAccessMode.Tailscale && (_snapshot == null || !_snapshot.TailscaleOk))
+            {
+                if (TailscaleManager.FindExecutable() != null)
+                {
+                    RefreshDependencies();
+                    return;
+                }
+                TailscaleManager.OpenDownloadPage();
+                return;
+            }
+            BeginSetup(true);
+        }
+
+        private void UpdateAccessLink()
+        {
+            if (_accessLink == null) return;
+            _accessLink.Text = "Public access: " + _settings.GetMode().DisplayName();
+            _accessLink.Invalidate();
+            if (!_hasLink)
+            {
+                _urlHint.Text = _settings.GetMode() == PublicAccessMode.Tailscale
+                    ? "Stable Tailscale URL - it stays the same after every restart."
+                    : "In Stremio: Addons, then Install from URL. Quick-tunnel links change when the relay restarts.";
+            }
+        }
+
+        private void OpenPublicAccess()
+        {
+            using (var dialog = new PublicAccessDialog(this))
+            {
+                dialog.ShowDialog(this);
+            }
+            UpdateAccessLink();
+            RefreshDependencies();
+        }
+
+        internal AppPaths Paths { get { return _paths; } }
+        internal AppSettings Settings { get { return _settings; } }
+        internal TailscaleManager Tailscale { get { return _tailscale; } }
+        internal PublicAccessMode AccessMode { get { return _settings.GetMode(); } }
+        internal bool RelayActive { get { return _relay.IsActive; } }
+        internal PublicAccessMode RunningMode { get { return _relay.StartedMode; } }
+        internal int RelayPort { get { return _settings.Port; } }
+        internal string CurrentManifest { get { return _lastManifest; } }
+        internal void LogAccess(string text, LogLevel level) { AppendLocalLog(level, text); }
+
+        internal void ApplyAccessMode(PublicAccessMode mode)
+        {
+            if (mode == _settings.GetMode()) return;
+
+            if (mode == PublicAccessMode.Tailscale)
+            {
+                CaptureCloudflareConfig();
+                var values = new Dictionary<string, string>
+                {
+                    { "TUNNEL", "0" },
+                    { "TUNNEL_TOKEN", string.Empty },
+                };
+                string host = _settings.TailscaleHostname;
+                if (!string.IsNullOrEmpty(host)) values["PUBLIC_URL"] = "https://" + host;
+                string backup;
+                EnvFileEditor.SetValues(_paths.EnvFile, values, out backup);
+                _settings.SetMode(PublicAccessMode.Tailscale);
+            }
+            else
+            {
+                RestoreCloudflareConfig();
+                _settings.SetMode(PublicAccessMode.Cloudflare);
+            }
+
+            _settings.Save();
+            UpdateAccessLink();
+            RefreshDependencies();
+        }
+
+        internal void ApplyTailscaleHostname(string host)
+        {
+            if (string.IsNullOrEmpty(host)) return;
+            _settings.TailscaleHostname = host;
+            _settings.Save();
+
+            var values = new Dictionary<string, string>
+            {
+                { "PUBLIC_URL", "https://" + host },
+                { "TUNNEL", "0" },
+                { "TUNNEL_TOKEN", string.Empty },
+            };
+            string backup;
+            EnvFileEditor.SetValues(_paths.EnvFile, values, out backup);
+            UpdateAccessLink();
+        }
+
+        private void CaptureCloudflareConfig()
+        {
+            if (_settings.CloudflareConfigCaptured) return;
+            _settings.CloudflarePublicUrl = EnvFileEditor.ReadValue(_paths.EnvFile, "PUBLIC_URL") ?? string.Empty;
+            _settings.CloudflareTunnelValue = EnvFileEditor.ReadValue(_paths.EnvFile, "TUNNEL") ?? string.Empty;
+            _settings.CloudflareTunnelToken = EnvFileEditor.ReadValue(_paths.EnvFile, "TUNNEL_TOKEN") ?? string.Empty;
+            _settings.CloudflareConfigCaptured = true;
+            _settings.Save();
+        }
+
+        private void RestoreCloudflareConfig()
+        {
+            var values = new Dictionary<string, string>
+            {
+                { "PUBLIC_URL", _settings.CloudflarePublicUrl ?? string.Empty },
+                { "TUNNEL", string.IsNullOrEmpty(_settings.CloudflareTunnelValue) ? "1" : _settings.CloudflareTunnelValue },
+                { "TUNNEL_TOKEN", _settings.CloudflareTunnelToken ?? string.Empty },
+            };
+            string backup;
+            EnvFileEditor.SetValues(_paths.EnvFile, values, out backup);
+        }
+
+        internal async Task<bool> StartRelayForAccessAsync()
+        {
+            if (_relay.IsActive) return true;
+            if (_snapshot == null || !_snapshot.Ready) await RefreshDependenciesAsync();
+            if (_snapshot == null || !_snapshot.Ready) return false;
+            try
+            {
+                await _relay.StartAsync();
+                _healthTimer.Start();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                AppendLocalLog(LogLevel.Error, ex.Message);
+                return false;
+            }
+        }
+
+        internal async Task RestartRelayForAccessAsync()
+        {
+            if (_relay.IsActive) await _relay.StopAsync();
+            await RefreshDependenciesAsync();
+            if (_snapshot != null && _snapshot.Ready) await StartRelayForAccessAsync();
+        }
+
+        internal void CopyManifest() { CopyLink(); }
+        internal void InstallManifest() { OpenStremio(); }
+        internal void RefreshDashboardAccess() { UpdateAccessLink(); RefreshDependencies(); }
 
         // ----------------------------------------------------------------- prefs
 
@@ -1720,8 +1907,21 @@ namespace DhakaFlixRelay
         {
             if (_quitting) return;
 
-            if (!string.IsNullOrEmpty(_lastIssuedLink) && !ConfirmQuit())
-                return;
+            if (!string.IsNullOrEmpty(_lastIssuedLink))
+            {
+                if (_settings.GetMode() == PublicAccessMode.Tailscale)
+                {
+                    DialogResult stable = MessageBox.Show(this,
+                        "Stop the relay and quit?" + Environment.NewLine + Environment.NewLine +
+                        "Your stable Tailscale URL stays the same and works again the next time DhakaFlix starts.",
+                        "DhakaFlix Relay", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                    if (stable != DialogResult.Yes) return;
+                }
+                else if (!ConfirmQuit())
+                {
+                    return;
+                }
+            }
 
             _quitting = true;
             _healthTimer.Stop();

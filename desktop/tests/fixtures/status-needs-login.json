@@ -1,0 +1,11 @@
+{
+  "Version": "1.102.4-test",
+  "BackendState": "NeedsLogin",
+  "HaveNodeKey": false,
+  "AuthURL": "https://login.tailscale.com/a/example",
+  "MagicDNSSuffix": "",
+  "Self": { "DNSName": "", "Online": false },
+  "CurrentTailnet": { "MagicDNSEnabled": false },
+  "CertDomains": [],
+  "Health": []
+}

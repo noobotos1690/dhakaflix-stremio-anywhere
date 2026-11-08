@@ -75,20 +75,40 @@ Prefer a window over a terminal? Download one of these from the
 
 | Build | What it does |
 | --- | --- |
-| `DhakaFlixRelay-Setup-1.1.0.exe` | Per-user installer with Start Menu/desktop shortcuts and an uninstaller |
-| `DhakaFlixRelay-Portable-1.1.0.zip` | Unzip anywhere and run `DhakaFlixRelay.exe`; no install |
+| `DhakaFlixRelay-Setup-1.2.0.exe` | Per-user installer with Start Menu/desktop shortcuts and an uninstaller |
+| `DhakaFlixRelay-Portable-1.2.0.zip` | Unzip anywhere and run `DhakaFlixRelay.exe`; no install |
 
 Both need no administrator rights. The dashboard gives you Start/Stop, live
 status, the Stremio install link, realtime logs and a launch-at-Windows-startup
-toggle. On first launch it installs Node.js, the npm packages, `cloudflared` and
-`.env` locally with a progress bar (admin only if the automatic Node.js download
-is blocked, where it offers a winget install). The first successful start opens
+toggle. On first launch it installs Node.js, the npm packages and `.env`
+locally with a progress bar (admin only if the automatic Node.js download is
+blocked, where it offers a winget install). The first successful start opens
 Stremio so the addon can be added immediately.
 
+### Public access: temporary or stable
+
+The addon card has a **Public access** link with two modes:
+
+| Mode | URL | Requirements |
+| --- | --- | --- |
+| **Cloudflare Quick Tunnel** | New `*.trycloudflare.com` hostname every start | `cloudflared` (installed by the app) |
+| **Tailscale Funnel** | Permanent `https://<machine>.<tailnet>.ts.net` | Tailscale app installed and signed in; MagicDNS and HTTPS certificates enabled; Funnel allowed by the tailnet policy |
+
+Tailscale mode works behind CGNAT and needs no port forwarding. Open **Public
+access → Tailscale Funnel**, click **Connect** if needed, then **Enable Funnel**.
+The app starts the relay, enables only its own port-443 Funnel listener, verifies
+`/health` and `/manifest.json` over HTTPS, and shows the stable manifest URL.
+The URL survives relay and Windows restarts while the app keeps running.
+
+Two limits are explicit: Funnel hostnames only use Tailscale's `ts.net` domain,
+so a custom domain such as `dhakaflix.dpdns.org` is **not** attached to it; and
+Tailscale applies bandwidth limits to sustained video streaming, so playback
+performance may vary.
+
 Closing the window keeps the relay running in the tray; the app is only
-terminated from the tray icon. Because the quick tunnel gets a new URL on every
-start, exiting shows a reminder to remove the addon from Stremio first (or use a
-[named tunnel](#public-install-stable-hostname) for a permanent link).
+terminated from the tray icon. In Cloudflare mode, exiting reminds you to remove
+the addon from Stremio because the quick-tunnel URL changes; Tailscale mode
+keeps the same URL.
 
 ![DhakaFlix Relay desktop dashboard](docs/desktop-app.png)
 
@@ -178,6 +198,24 @@ docker compose --profile tunnel up -d             # + stable tunnel
 > A regular cloud VPS (Fly, Render, Railway, Hetzner…) will **not** work: it
 > cannot route to `172.16.50.0/24`, so searches return nothing and playback
 > fails. The host must be on a network that reaches the mirrors.
+
+
+### Option C — Tailscale Funnel (no domain, desktop app)
+
+The Windows desktop app can publish the relay through Tailscale Funnel:
+
+- No public IPv4/IPv6 and no router port forwarding; works behind CGNAT.
+- The URL is stable: `https://<machine>.<tailnet>.ts.net/manifest.json`.
+- Requires Tailscale installed and signed in, MagicDNS, HTTPS certificates and
+  Funnel allowed by the tailnet policy.
+- Only `ts.net` hostnames are available; a custom domain such as
+  `dhakaflix.dpdns.org` is not attached to Funnel. Tailscale also limits
+  sustained video bandwidth.
+
+Open **Public access → Tailscale Funnel** in the dashboard, click **Connect** if
+needed, then **Enable Funnel**. See
+[desktop/README.md](desktop/README.md#tailscale-funnel) for the GUI flow and
+troubleshooting.
 
 ---
 

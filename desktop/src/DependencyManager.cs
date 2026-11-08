@@ -19,12 +19,19 @@ namespace DhakaFlixRelay
         public string NodeVersion;
         public bool ModulesOk;
         public bool CloudflaredOk;
+        public bool TailscaleOk;
         public bool EnvOk;
         public string EnvProblem;
+        public PublicAccessMode Mode;
+
+        public bool TransportOk
+        {
+            get { return Mode == PublicAccessMode.Tailscale ? TailscaleOk : CloudflaredOk; }
+        }
 
         public bool Ready
         {
-            get { return SourceOk && NodeOk && ModulesOk && CloudflaredOk && EnvOk; }
+            get { return SourceOk && NodeOk && ModulesOk && EnvOk && TransportOk; }
         }
 
         public List<string> Missing()
@@ -33,7 +40,14 @@ namespace DhakaFlixRelay
             if (!SourceOk) missing.Add("Relay source files");
             if (!NodeOk) missing.Add("Node.js 18+");
             if (!ModulesOk) missing.Add("npm packages");
-            if (!CloudflaredOk) missing.Add("cloudflared");
+            if (Mode == PublicAccessMode.Tailscale)
+            {
+                if (!TailscaleOk) missing.Add("Tailscale");
+            }
+            else
+            {
+                if (!CloudflaredOk) missing.Add("cloudflared");
+            }
             if (!EnvOk) missing.Add("configuration (.env)");
             return missing;
         }
@@ -64,7 +78,13 @@ namespace DhakaFlixRelay
 
         public DependencySnapshot Inspect()
         {
+            return Inspect(PublicAccessMode.Cloudflare);
+        }
+
+        public DependencySnapshot Inspect(PublicAccessMode mode)
+        {
             var snapshot = new DependencySnapshot();
+            snapshot.Mode = mode;
             snapshot.SourceOk = _paths.HasRelaySource();
 
             ResolveNode();
@@ -76,6 +96,7 @@ namespace DhakaFlixRelay
                                  Directory.Exists(Path.Combine(_paths.NodeModulesDir, "axios"));
 
             snapshot.CloudflaredOk = File.Exists(_paths.CloudflaredExe) && new FileInfo(_paths.CloudflaredExe).Length > 1024 * 1024;
+            snapshot.TailscaleOk = TailscaleManager.FindExecutable() != null;
 
             snapshot.EnvOk = ReadSecret() != null;
             if (!snapshot.EnvOk)
@@ -160,19 +181,24 @@ namespace DhakaFlixRelay
 
         public async Task<bool> InstallAsync(IProgress<SetupProgress> progress, CancellationToken cancellation)
         {
+            return await InstallAsync(progress, PublicAccessMode.Cloudflare, cancellation).ConfigureAwait(false);
+        }
+
+        public async Task<bool> InstallAsync(IProgress<SetupProgress> progress, PublicAccessMode mode, CancellationToken cancellation)
+        {
             try
             {
-                _log("Starting dependency setup", LogLevel.Info);
+                _log("Starting dependency setup for " + mode.DisplayName(), LogLevel.Info);
 
                 if (!_paths.HasRelaySource())
                     throw new InvalidOperationException("index.js / package.json were not found next to the app. Reinstall the app.");
 
-                DependencySnapshot snapshot = Inspect();
+                DependencySnapshot snapshot = Inspect(mode);
 
                 if (!snapshot.NodeOk)
                 {
                     if (!await EnsureNodeAsync(progress, cancellation)) return false;
-                    snapshot = Inspect();
+                    snapshot = Inspect(mode);
                     if (!snapshot.NodeOk) throw new InvalidOperationException("Node.js could not be installed.");
                 }
 
@@ -183,14 +209,26 @@ namespace DhakaFlixRelay
                 if (!snapshot.ModulesOk)
                 {
                     await InstallModulesAsync(progress, cancellation);
-                    snapshot = Inspect();
+                    snapshot = Inspect(mode);
                     if (!snapshot.ModulesOk) throw new InvalidOperationException("npm packages are still missing after install.");
                 }
 
-                if (!snapshot.CloudflaredOk)
+                if (mode == PublicAccessMode.Tailscale)
+                {
+                    if (snapshot.TailscaleOk)
+                    {
+                        progress.Report(new SetupProgress { Step = "Tailscale", Detail = "Tailscale client detected.", Percent = 96 });
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException(
+                            "Tailscale is not installed. Use \"Install Tailscale\" in Public access, then retry.");
+                    }
+                }
+                else if (!snapshot.CloudflaredOk)
                 {
                     await InstallCloudflaredAsync(progress, cancellation);
-                    snapshot = Inspect();
+                    snapshot = Inspect(mode);
                     if (!snapshot.CloudflaredOk) throw new InvalidOperationException("cloudflared could not be downloaded.");
                 }
 

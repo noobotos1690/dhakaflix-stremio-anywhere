@@ -4,9 +4,18 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace DhakaFlixRelay
 {
+    internal sealed class ProcessResult
+    {
+        public int ExitCode;
+        public string StdOut = string.Empty;
+        public string StdErr = string.Empty;
+        public bool TimedOut;
+    }
+
     /// <summary>Runs a console tool with live, line-buffered output.</summary>
     internal static class ProcessRunner
     {
@@ -169,6 +178,50 @@ namespace DhakaFlixRelay
             {
                 return string.Empty;
             }
+        }
+
+        public static ProcessResult CaptureResult(string fileName, string arguments, string workingDirectory, int timeoutMs)
+        {
+            var result = new ProcessResult();
+            try
+            {
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    Arguments = arguments,
+                    WorkingDirectory = workingDirectory,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    StandardOutputEncoding = new UTF8Encoding(false),
+                    StandardErrorEncoding = new UTF8Encoding(false),
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                };
+
+                using (var process = new Process { StartInfo = startInfo })
+                {
+                    process.Start();
+                    Task<string> stdout = process.StandardOutput.ReadToEndAsync();
+                    Task<string> stderr = process.StandardError.ReadToEndAsync();
+
+                    if (!process.WaitForExit(Math.Max(1000, timeoutMs)))
+                    {
+                        result.TimedOut = true;
+                        KillTree(process);
+                    }
+
+                    try { result.StdOut = stdout.Result; } catch { result.StdOut = string.Empty; }
+                    try { result.StdErr = stderr.Result; } catch { result.StdErr = string.Empty; }
+                    try { result.ExitCode = process.HasExited ? process.ExitCode : -1; } catch { result.ExitCode = -1; }
+                }
+            }
+            catch (Exception ex)
+            {
+                result.ExitCode = -1;
+                result.StdErr = ex.Message;
+            }
+            return result;
         }
 
         public static string PrependToPath(string directory)

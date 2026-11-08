@@ -3,7 +3,7 @@
 ; install. Built with Inno Setup 6.
 
 #define AppName "DhakaFlix Relay"
-#define AppVersion "1.1.0"
+#define AppVersion "1.2.0"
 #define AppExe "DhakaFlixRelay.exe"
 #define AppPublisher "DhakaFlix"
 

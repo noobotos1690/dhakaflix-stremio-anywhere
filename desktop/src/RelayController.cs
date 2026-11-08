@@ -58,19 +58,22 @@ namespace DhakaFlixRelay
         private readonly AppPaths _paths;
         private readonly AppSettings _settings;
         private readonly Action<string, LogLevel> _log;
+        private readonly TailscaleManager _tailscale;
         private readonly StringBuilder _recent = new StringBuilder();
         private readonly object _sync = new object();
 
         private Process _process;
         private IntPtr _job;
         private bool _intentionalStop;
+        private bool _tailscaleStartup;
         private DateTime _startedAt;
         private System.Threading.Timer _healthTimer;
 
-        public RelayController(AppPaths paths, AppSettings settings, Action<string, LogLevel> log)
+        public RelayController(AppPaths paths, AppSettings settings, TailscaleManager tailscale, Action<string, LogLevel> log)
         {
             _paths = paths;
             _settings = settings;
+            _tailscale = tailscale;
             _log = log;
             State = RelayState.Stopped;
             LocalUrl = "http://127.0.0.1:" + settings.Port;
@@ -88,6 +91,7 @@ namespace DhakaFlixRelay
         public string DeepLink { get; private set; }
         public string LocalUrl { get; private set; }
         public string LastError { get; private set; }
+        public PublicAccessMode StartedMode { get; private set; }
 
         public bool IsActive
         {
@@ -106,9 +110,9 @@ namespace DhakaFlixRelay
 
         // ------------------------------------------------------------------ start
 
-        public Task StartAsync()
+        public async Task StartAsync()
         {
-            if (IsActive) return Task.FromResult(true);
+            if (IsActive) return;
 
             if (_process != null)
             {
@@ -123,8 +127,55 @@ namespace DhakaFlixRelay
             if (!IsPortFree(_settings.Port))
                 throw new InvalidOperationException("Port " + _settings.Port + " is already in use. Stop the other relay or change the port in Preferences.");
 
+            PublicAccessMode mode = _settings.GetMode();
+            bool tailscaleMode = mode == PublicAccessMode.Tailscale;
+            StartedMode = mode;
+            _tailscaleStartup = tailscaleMode;
+            string tailscaleHost = null;
+
+            if (tailscaleMode)
+            {
+                if (_tailscale == null)
+                    throw new TailscaleException(TailscaleIssue.NotInstalled, "Tailscale support is unavailable.");
+
+                TailscaleStatusInfo status = await _tailscale.GetStatusAsync().ConfigureAwait(true);
+                if (!status.Installed)
+                    throw new TailscaleException(TailscaleIssue.NotInstalled,
+                        "Tailscale is not installed. Install it from the Public access dialog first.");
+                if (!status.ServiceRunning)
+                    throw new TailscaleException(TailscaleIssue.ServiceStopped,
+                        "The Tailscale service is not running. Start Tailscale, then retry.");
+                if (!status.Connected)
+                    throw new TailscaleException(TailscaleIssue.NotConnected,
+                        status.NeedsLogin
+                            ? "Tailscale needs you to sign in. Use Connect Tailscale in Public access."
+                            : "Tailscale is not connected. Use Connect Tailscale in Public access.");
+
+                tailscaleHost = status.Hostname;
+                if (string.IsNullOrEmpty(tailscaleHost))
+                    throw new TailscaleException(TailscaleIssue.HttpsCertificate,
+                        "Tailscale has not assigned an HTTPS hostname yet. Enable HTTPS certificates in the Tailscale admin console.");
+
+                _settings.TailscaleHostname = tailscaleHost;
+                _settings.Save();
+                try
+                {
+                    string backup;
+                    EnvFileEditor.SetValues(_paths.EnvFile, new Dictionary<string, string>
+                    {
+                        { "PUBLIC_URL", "https://" + tailscaleHost },
+                        { "TUNNEL", "0" },
+                        { "TUNNEL_TOKEN", string.Empty },
+                    }, out backup);
+                }
+                catch
+                {
+                    // The process environment below is authoritative.
+                }
+            }
+
             LocalUrl = "http://127.0.0.1:" + _settings.Port;
-            PublicUrl = ReadConfiguredPublicUrl();
+            PublicUrl = tailscaleMode ? "https://" + tailscaleHost : ReadConfiguredPublicUrl();
             ManifestUrl = PublicUrl != null ? PublicUrl.TrimEnd('/') + "/manifest.json" : null;
             DeepLink = ManifestUrl != null ? ToDeepLink(ManifestUrl) : null;
             LastError = null;
@@ -135,7 +186,7 @@ namespace DhakaFlixRelay
             var startInfo = new ProcessStartInfo
             {
                 FileName = node,
-                Arguments = "index.js --tunnel",
+                Arguments = tailscaleMode ? "index.js" : "index.js --tunnel",
                 WorkingDirectory = _paths.Root,
                 UseShellExecute = false,
                 CreateNoWindow = true,
@@ -148,14 +199,22 @@ namespace DhakaFlixRelay
             startInfo.EnvironmentVariables["PORT"] = _settings.Port.ToString();
             startInfo.EnvironmentVariables["LOG_LEVEL"] = "info";
             startInfo.EnvironmentVariables["PATH"] = ProcessRunner.PrependToPath(Path.GetDirectoryName(node));
+            if (tailscaleMode)
+            {
+                startInfo.EnvironmentVariables["PUBLIC_URL"] = PublicUrl;
+                startInfo.EnvironmentVariables["TUNNEL"] = "0";
+                startInfo.EnvironmentVariables["TUNNEL_TOKEN"] = string.Empty;
+            }
 
             _process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
             _process.OutputDataReceived += (s, e) => HandleOutput(e.Data, false);
             _process.ErrorDataReceived += (s, e) => HandleOutput(e.Data, true);
             _process.Exited += (s, e) => HandleExit();
 
-            SetState(RelayState.Starting, "Boot sequence started on port " + _settings.Port + ".");
-            WriteLog(LogLevel.Info, "Starting relay: node index.js --tunnel (port " + _settings.Port + ")");
+            SetState(RelayState.Starting, tailscaleMode
+                ? "Starting the local relay for Tailscale Funnel..."
+                : "Boot sequence started on port " + _settings.Port + ".");
+            WriteLog(LogLevel.Info, "Starting relay: node " + startInfo.Arguments + " (port " + _settings.Port + ", " + mode.DisplayName() + ")");
 
             try
             {
@@ -173,10 +232,129 @@ namespace DhakaFlixRelay
             }
 
             _healthTimer = new System.Threading.Timer(PollHealth, null, 1500, 3000);
-            if (PublicUrl != null)
-                RaisePublicUrl(PublicUrl);
 
-            return Task.FromResult(true);
+            if (!tailscaleMode)
+            {
+                if (PublicUrl != null)
+                    RaisePublicUrl(PublicUrl);
+                return;
+            }
+
+            try
+            {
+                await WaitForLocalHealthAsync(25).ConfigureAwait(true);
+                WriteLog(LogLevel.Info, "Local relay is healthy; configuring Tailscale Funnel");
+                TailscaleFunnelInfo funnel = await _tailscale.EnableFunnelAsync(_settings.Port, (text, level) => WriteLog(level, text)).ConfigureAwait(true);
+
+                string host = !string.IsNullOrEmpty(funnel.Hostname) ? funnel.Hostname : tailscaleHost;
+                await WaitForPublicEndpointsAsync(host, 90).ConfigureAwait(true);
+
+                PublicUrl = "https://" + host;
+                ManifestUrl = PublicUrl + "/manifest.json";
+                DeepLink = ToDeepLink(ManifestUrl);
+                WriteLog(LogLevel.Info, "Stremio install link: " + ManifestUrl);
+                _tailscaleStartup = false;
+                RaisePublicUrl(ManifestUrl);
+                SetState(RelayState.Running, "Stable Tailscale URL is live.");
+            }
+            catch (TailscaleException ex)
+            {
+                _tailscaleStartup = false;
+                if (_intentionalStop) return;
+                WriteLog(LogLevel.Error, ex.Message);
+                KillRelayProcess();
+                SetState(RelayState.Error, ex.Message);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _tailscaleStartup = false;
+                if (_intentionalStop) return;
+                WriteLog(LogLevel.Error, "Tailscale startup failed: " + ex.Message);
+                KillRelayProcess();
+                SetState(RelayState.Error, "Tailscale startup failed: " + ex.Message);
+                throw;
+            }
+        }
+
+        private async Task WaitForLocalHealthAsync(int timeoutSeconds)
+        {
+            DateTime deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+            while (DateTime.UtcNow < deadline)
+            {
+                if (_intentionalStop) throw new InvalidOperationException("Startup was cancelled.");
+                if (_process != null)
+                {
+                    try { if (_process.HasExited) throw new InvalidOperationException("The local relay exited during startup."); }
+                    catch (InvalidOperationException) { throw; }
+                    catch { }
+                }
+                if (await CheckUrlAsync(LocalUrl + "/health", 2500).ConfigureAwait(true))
+                    return;
+                await Task.Delay(700).ConfigureAwait(true);
+            }
+            throw new InvalidOperationException("The local relay did not become healthy. Check the live output.");
+        }
+
+        private async Task WaitForPublicEndpointsAsync(string host, int timeoutSeconds)
+        {
+            string origin = "https://" + host;
+            DateTime deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+            DateTime nextNotice = DateTime.UtcNow.AddSeconds(10);
+            while (DateTime.UtcNow < deadline)
+            {
+                if (_intentionalStop) throw new InvalidOperationException("Startup was cancelled.");
+                bool health = await CheckUrlAsync(origin + "/health", 4000).ConfigureAwait(true);
+                bool manifest = health && await CheckUrlAsync(origin + "/manifest.json", 4000).ConfigureAwait(true);
+                if (health && manifest)
+                {
+                    WriteLog(LogLevel.Info, "Public health and manifest checks passed for " + origin);
+                    return;
+                }
+                if (DateTime.UtcNow >= nextNotice)
+                {
+                    nextNotice = DateTime.UtcNow.AddSeconds(10);
+                    WriteLog(LogLevel.Info, "Waiting for " + origin + " to answer (certificate or Funnel may still be starting)...");
+                }
+                await Task.Delay(1500).ConfigureAwait(true);
+            }
+            throw new TailscaleException(TailscaleIssue.PublicHealth,
+                "The public Tailscale URL did not pass its health checks. Check Funnel in the admin console.");
+        }
+
+        private static async Task<bool> CheckUrlAsync(string url, int timeoutMs)
+        {
+            try
+            {
+                var request = (HttpWebRequest)WebRequest.Create(url);
+                request.Timeout = timeoutMs;
+                request.ReadWriteTimeout = timeoutMs;
+                request.Proxy = null;
+                request.Method = "GET";
+                using (WebResponse response = await request.GetResponseAsync().ConfigureAwait(false))
+                {
+                    int code = (int)((HttpWebResponse)response).StatusCode;
+                    if (code != 200) return false;
+                    using (var reader = new StreamReader(response.GetResponseStream()))
+                        await reader.ReadToEndAsync().ConfigureAwait(false);
+                    return true;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void KillRelayProcess()
+        {
+            _intentionalStop = true;
+            Process process = _process;
+            _process = null;
+            if (process == null) return;
+            CleanupJob();
+            try { if (!process.HasExited) ProcessRunner.KillTree(process); } catch { }
+            try { process.Dispose(); } catch { }
         }
 
         private string ResolveNodeForRun()
@@ -229,6 +407,7 @@ namespace DhakaFlixRelay
             SetState(RelayState.Stopping, "Shutting down relay and tunnel...");
             WriteLog(LogLevel.Info, "Stopping relay");
             _intentionalStop = true;
+            _tailscaleStartup = false;
 
             StopHealthTimer();
 
@@ -281,35 +460,38 @@ namespace DhakaFlixRelay
             string line = AnsiPattern.Replace(raw, string.Empty).TrimEnd();
             if (line.Length == 0) return;
 
-            if (line.IndexOf("trycloudflare.com", StringComparison.OrdinalIgnoreCase) >= 0)
+            if (!_tailscaleStartup)
             {
-                Match quick = QuickTunnelPattern.Match(line);
-                if (quick.Success) AdoptPublicUrl(quick.Value, false);
-            }
-
-            Match publicMatch = PublicUrlPattern.Match(line);
-            if (publicMatch.Success) AdoptPublicUrl(publicMatch.Groups[1].Value.TrimEnd('/'), false);
-
-            Match installMatch = InstallLinePattern.Match(line);
-            if (installMatch.Success)
-            {
-                string manifest = installMatch.Groups[1].Value.TrimEnd('/');
-                if (manifest.EndsWith("/manifest.json", StringComparison.OrdinalIgnoreCase))
+                if (line.IndexOf("trycloudflare.com", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
-                    string origin = manifest.Substring(0, manifest.Length - "/manifest.json".Length);
-                    if (QuickTunnelPattern.IsMatch(origin) || origin.IndexOf("127.0.0.1", StringComparison.Ordinal) >= 0 ||
-                        origin.IndexOf("localhost", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                        ReadConfiguredPublicUrl() != null)
+                    Match quick = QuickTunnelPattern.Match(line);
+                    if (quick.Success) AdoptPublicUrl(quick.Value, false);
+                }
+
+                Match publicMatch = PublicUrlPattern.Match(line);
+                if (publicMatch.Success) AdoptPublicUrl(publicMatch.Groups[1].Value.TrimEnd('/'), false);
+
+                Match installMatch = InstallLinePattern.Match(line);
+                if (installMatch.Success)
+                {
+                    string manifest = installMatch.Groups[1].Value.TrimEnd('/');
+                    if (manifest.EndsWith("/manifest.json", StringComparison.OrdinalIgnoreCase))
                     {
-                        AdoptPublicUrl(origin, origin.IndexOf("127.0.0.1", StringComparison.Ordinal) >= 0);
+                        string origin = manifest.Substring(0, manifest.Length - "/manifest.json".Length);
+                        if (QuickTunnelPattern.IsMatch(origin) || origin.IndexOf("127.0.0.1", StringComparison.Ordinal) >= 0 ||
+                            origin.IndexOf("localhost", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                            ReadConfiguredPublicUrl() != null)
+                        {
+                            AdoptPublicUrl(origin, origin.IndexOf("127.0.0.1", StringComparison.Ordinal) >= 0);
+                        }
                     }
                 }
-            }
 
-            Match listen = ListeningPattern.Match(line);
-            if (listen.Success && State == RelayState.Starting && !_intentionalStop)
-            {
-                SetState(RelayState.Starting, "Local relay is up - waiting for the public tunnel.");
+                Match listen = ListeningPattern.Match(line);
+                if (listen.Success && State == RelayState.Starting && !_intentionalStop)
+                {
+                    SetState(RelayState.Starting, "Local relay is up - waiting for the public tunnel.");
+                }
             }
 
             if (isError || line.IndexOf("[ERROR]", StringComparison.OrdinalIgnoreCase) >= 0)
