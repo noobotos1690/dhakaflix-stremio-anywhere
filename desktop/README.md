@@ -138,6 +138,24 @@ to Cloudflare restores `PUBLIC_URL`, `TUNNEL` and `TUNNEL_TOKEN` in `.env` from
 that saved state. `.env` edits are line-based, keep comments and unrelated keys,
 never touch `PROXY_SECRET`, and write a `.env.bak-<timestamp>` backup first.
 
+### A constant, friendlier name
+
+The `ts.net` URL is permanent, but its first label is the Tailscale device
+name. To use a name like dhakaflix instead of the machine name:
+
+1. Disable Funnel in the app (if active).
+2. Open the Tailscale admin console → **Machines** → your device → **Rename**,
+   for example to dhakaflix.
+3. Return to Public access, click **Refresh**, then **Enable Funnel**.
+
+The URL becomes https://dhakaflix.<tailnet>.ts.net. Renaming changes the URL,
+so update the addon in Stremio afterwards.
+
+A custom domain such as dhakaflix.dpdns.org **cannot** be attached to
+Tailscale Funnel. Funnel only serves `ts.net` hostnames. A custom domain needs a
+Cloudflare named tunnel with the domain delegated to Cloudflare (separate from
+Tailscale mode).
+
 ### Custom domain limitation
 
 Tailscale Funnel only publishes hostnames under the tailnet's **`ts.net`**

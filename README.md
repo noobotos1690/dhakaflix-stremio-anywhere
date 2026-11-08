@@ -208,6 +208,9 @@ The Windows desktop app can publish the relay through Tailscale Funnel:
 - The URL is stable: `https://<machine>.<tailnet>.ts.net/manifest.json`.
 - Requires Tailscale installed and signed in, MagicDNS, HTTPS certificates and
   Funnel allowed by the tailnet policy.
+- The URL is permanent, but its first label is the Tailscale device name. Rename
+  the device in the admin console (with Funnel disabled) to get a friendlier
+  `dhakaflix.<tailnet>.ts.net` name.
 - Only `ts.net` hostnames are available; a custom domain such as
   `dhakaflix.dpdns.org` is not attached to Funnel. Tailscale also limits
   sustained video bandwidth.
