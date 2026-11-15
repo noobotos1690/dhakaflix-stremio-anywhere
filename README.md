@@ -111,8 +111,6 @@ terminated from the tray icon. In Cloudflare mode, exiting reminds you to remove
 the addon from Stremio because the quick-tunnel URL changes; Tailscale mode
 keeps the same URL.
 
-![DhakaFlix Relay desktop dashboard](docs/desktop-app.png)
-
 The window is a native Rust + Slint application: Overview, Public access,
 Diagnostics, Logs and Settings as separate pages, a log view that filters by
 level and text, and credentials masked before they reach the window.

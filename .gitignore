@@ -26,9 +26,6 @@ desktop/tests/bin/
 desktop-rust/target/
 desktop-rust/dist/
 
-# Retired WinForms app: kept in history, no longer shipped from this repo
-/desktop/
-
 # Local state written by the app
 .env.bak-*
 logs/

@@ -1069,7 +1069,6 @@ export component LogList inherits Flickable {
 
 export component Toast inherits Rectangle {
     in property <string> message: "";
-    in property <string> kind: "info";
     in property <bool> shown: false;
     // An empty message used to leave a blank box floating in the corner.
     visible: shown && root.message != "";
@@ -1089,9 +1088,6 @@ export component Toast inherits Rectangle {
         padding-right: 14px;
         spacing: 10px;
 
-        StatusDot {
-            kind: kind == "error" ? "error" : (kind == "ok" ? "ok" : "accent");
-        }
         text-message := Text {
             horizontal-stretch: 1;
             text: root.message;

@@ -151,8 +151,8 @@ icon. No TLS stack: HTTPS goes through WinHTTP, so the binary has no OpenSSL
 dependency and no extra runtime files.
 
 Process management uses `taskkill /PID <pid> /T` and escalates to `/F` after
-three seconds. That is the same mechanism the C# build used, because a console
-node process on Windows has no portable graceful signal.
+three seconds, because a console node process on Windows has no portable
+graceful signal.
 
 ### Relay adoption
 
@@ -165,9 +165,10 @@ listening:
 
 No untrusted PID is ever terminated.
 
-## Migration from the 1.2.0 C# build
+## Upgrading from 1.2.0
 
-The Rust app reads and writes the same state, so an upgrade needs no export:
+The app reads and writes the same state as the 1.2.0 build, so an upgrade needs
+no export:
 
 - `%APPDATA%\DhakaFlix Relay\settings.json` keeps its PascalCase keys. New keys
   (`MaxStreams`, `LogLevel`, `MinimizeToTray`) are added on first save; unknown
@@ -180,18 +181,13 @@ The Rust app reads and writes the same state, so an upgrade needs no export:
 - Tailscale sign-in is a property of the Tailscale device, not of this app, so
   an existing Funnel setup is detected and reused.
 
-### Rollback
+The 1.2.0 C# build is no longer in the repository. Its sources are in the
+`v1.2.0` tag, and the installer and portable zip are still on that release. To
+roll back, uninstall this build and install
+`DhakaFlixRelay-Setup-1.2.0.exe` from the v1.2.0 release; nothing in `%APPDATA%`
+or `.env` has to be restored because both builds share the same format.
 
-`desktop/` (the C# WinForms application) is untouched, including its
-`installer.iss` and `build.ps1`. To roll back:
-
-1. Exit the Rust app from the tray.
-2. Run `desktop\build.ps1` and install `desktop\dist\DhakaFlixRelay-Setup-1.2.0.exe`,
-   or keep using the existing 1.2.0 install.
-3. Nothing in `%APPDATA%` or `.env` has to be restored: both builds share the
-   same format.
-
-The two installers use the same AppId and the same `Local\DhakaFlixRelay.Desktop`
+Both installers use the same AppId and the same `Local\DhakaFlixRelay.Desktop`
 mutex, so they replace each other rather than stacking up.
 
 ## Tests
