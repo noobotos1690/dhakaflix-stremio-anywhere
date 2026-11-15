@@ -1,4 +1,4 @@
-# DhakaFlix Relay — Rust desktop app
+# DhakaFlix Relay - Rust desktop app
 
 The Windows dashboard for the DhakaFlix Stremio relay, rewritten as a native
 Rust application with a Slint interface. The Node.js relay, BDIX providers, the

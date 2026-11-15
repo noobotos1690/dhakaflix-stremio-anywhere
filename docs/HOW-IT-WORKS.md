@@ -35,7 +35,7 @@ The four mirrors live on private addresses:
 172.16.50.14  DHAKA-FLIX-14   movies, Korean series
 ```
 
-`172.16.0.0/12` is RFC 1918 space — it is not routable on the public internet.
+`172.16.0.0/12` is RFC 1918 space - it is not routable on the public internet.
 These machines are only reachable because BDIX (the Bangladesh Internet Exchange)
 interconnects the country's ISPs over a private fabric. Two consequences follow:
 
@@ -60,9 +60,9 @@ forwarded by something that is also inside. That is the relay.
 
 The relay has two jobs that are easy to confuse:
 
-- **Discovery** — search the mirrors, walk season folders, match titles, answer
+- **Discovery** - search the mirrors, walk season folders, match titles, answer
   `/stream/...` with links.
-- **Transport** — actually carry the video bytes to the player.
+- **Transport** - actually carry the video bytes to the player.
 
 Discovery alone would have been a small cloud function. Transport is what forces
 the relay onto a BDIX-reachable machine, and it is what `/p/<token>` exists for.
@@ -109,7 +109,7 @@ Inside the relay:
    ```
 
 **Playback.** The player opens that `/p/…` URL. The relay verifies the token,
-opens the mirror file, and pipes bytes back — preserving the HTTP status codes
+opens the mirror file, and pipes bytes back - preserving the HTTP status codes
 players depend on (`206 Partial Content` and friends).
 
 ## 5. Inside the relay token
@@ -122,7 +122,7 @@ base64url(upstream URL) . expiry(unix seconds) . HMAC-SHA256(secret, "url.exp")
 
 Verification, in order:
 
-1. HMAC compared in constant time — so a token cannot be edited to point at a
+1. HMAC compared in constant time - so a token cannot be edited to point at a
    different file.
 2. Expiry checked (7 days by default).
 3. The decoded host/port must be one of the provider origins. Even with the
@@ -130,7 +130,7 @@ Verification, in order:
 
 That last check is what keeps the relay from being an open proxy: a leaked token
 authorises **one file on one mirror**, not arbitrary requests. Verified during
-development — forged tokens for cloud metadata, localhost and a neighbouring IP
+development - forged tokens for cloud metadata, localhost and a neighbouring IP
 all returned `403`.
 
 ## 6. Why Range support matters
@@ -147,7 +147,7 @@ Range: bytes=500000000-500000511
 
 The mirrors run nginx with `Accept-Ranges: bytes`, so the relay forwards the
 `Range` header verbatim and passes `Content-Range` / `Accept-Ranges` back. If any
-hop stripped `Range`, every seek would silently restart from byte zero — a
+hop stripped `Range`, every seek would silently restart from byte zero - a
 classic symptom of naive proxies.
 
 Measured on this deployment: first 2 KB in ~0.45 s, a seek to 750 MB in ~0.14 s.
@@ -171,7 +171,7 @@ probe marks the mirror unreachable for 5 minutes, so searches skip it entirely:
 
 The distinction that matters: a **connection timeout** (`ETIMEDOUT` on connect,
 `ECONNREFUSED`) means the host is gone and is worth blocking. A **slow response**
-does not — dhakaflix7 is legitimately slow, and blocking it would remove real
+does not - dhakaflix7 is legitimately slow, and blocking it would remove real
 results. That is why `src/health.js` classifies errors instead of counting them
 all equally.
 
@@ -230,9 +230,9 @@ The relay's upload is your connection's upload. Rough figures:
 | Quality | Bitrate | Per hour |
 | --- | --- | --- |
 | 720p | ~2.5 Mbps | ~1.1 GB |
-| 1080p | ~5–8 Mbps | ~2.3–3.6 GB |
+| 1080p | ~5-8 Mbps | ~2.3-3.6 GB |
 
-One 1080p viewer therefore needs roughly 5–8 Mbps of *upload*. Two simultaneous
+One 1080p viewer therefore needs roughly 5-8 Mbps of *upload*. Two simultaneous
 viewers roughly double it. `MAX_PROXY_STREAMS` (default 8) caps concurrency, and
 when it is hit the relay answers `503` with `Retry-After` rather than degrading
 every stream to a stutter.
@@ -247,17 +247,17 @@ save the upload entirely.
 | --- | --- |
 | Addon installs, every title shows no streams | relay host cannot route to `172.16.50.0/24` |
 | Streams appear, playback never starts | token expired, or `PROXY_SECRET` changed on restart |
-| Playback starts then stalls | upload saturated — lower concurrency or quality |
+| Playback starts then stalls | upload saturated - lower concurrency or quality |
 | Everything works, URL died overnight | quick-tunnel hostname changed; use a named tunnel |
 | Seek restarts from zero | a middlebox stripped `Range` (not the relay) |
 | 403 on a stream link | token past its expiry, or host outside the allow-list |
 
 ## 13. What is exposed to the internet
 
-- `GET /manifest.json` — public by design.
-- `GET /stream/…`, `GET /meta/…` — public; they only reveal what the mirrors hold.
-- `GET /p/<token>` — public, but scoped to one file and one mirror until expiry.
-- `GET /health` — public; shows mirror reachability, no credentials.
+- `GET /manifest.json` - public by design.
+- `GET /stream/…`, `GET /meta/…` - public; they only reveal what the mirrors hold.
+- `GET /p/<token>` - public, but scoped to one file and one mirror until expiry.
+- `GET /health` - public; shows mirror reachability, no credentials.
 - Nothing else. There is no admin surface, no upload path, no shell.
 
 The practical risk is not intrusion but **usage**: anyone with the manifest URL
@@ -269,5 +269,5 @@ rotate `PROXY_SECRET` to invalidate every outstanding link at once.
 Addons are discovered through Stremio's central catalogue, which requires an
 addon that works for everyone who installs it. This one only works while your
 relay is running, on your connection, for content only BDIX holds. Keeping it as
-a private, manually installed addon is the honest model — and it avoids
+a private, manually installed addon is the honest model - and it avoids
 advertising a relay that would collapse under public traffic.

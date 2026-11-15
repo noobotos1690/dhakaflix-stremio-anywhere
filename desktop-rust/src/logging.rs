@@ -130,6 +130,11 @@ impl LogHub {
         self.entries.lock().unwrap().clear();
     }
 
+    /// The values registered with [`add_secret`], for the panic hook.
+    pub fn secrets(&self) -> Vec<String> {
+        self.secrets.lock().unwrap().clone()
+    }
+
     pub fn len(&self) -> usize {
         self.entries.lock().unwrap().len()
     }
@@ -171,9 +176,14 @@ pub fn install_panic_hook(crash_file: std::path::PathBuf) {
 
         let stamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
         let backtrace = std::backtrace::Backtrace::force_capture();
+        // A panic message can carry the URL or the request it choked on, so the
+        // crash file goes through the same redaction as the log. Without this the
+        // crash file was the one place a token could land unmasked.
         let record = format!(
             "\n===== {stamp} =====\n{message}\nat {location}\n{backtrace}\n"
         );
+        let secrets = hub().map(|hub| hub.secrets()).unwrap_or_default();
+        let record = redact(&record, &secrets);
         if let Ok(mut file) = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
@@ -243,6 +253,8 @@ pub fn redact(text: &str, secrets: &[String]) -> String {
     out = mask_prefixed(&out, "TS_AUTHKEY=");
     out = mask_prefixed(&out, "authkey=");
     out = mask_prefixed(&out, "TUNNEL_TOKEN=");
+    out = mask_prefixed(&out, "PROXY_SECRET=");
+    out = mask_prefixed(&out, "PROXY_SECRET: ");
     mask_signed_paths(&out)
 }
 
@@ -332,5 +344,27 @@ mod tests {
         assert!(!flag.contains("kABC123"));
         assert!(flag.contains("--authkey=<redacted>"));
         assert!(redact("using tskey-auth-kABC123-xyz now", &[]).contains("<redacted>"));
+    }
+
+    #[test]
+    fn masks_proxy_secret_even_when_it_was_not_registered() {
+        let masked = redact("starting with PROXY_SECRET=9f8e7d6c5b4a39281706f5e4d3c2b1a0", &[]);
+        assert!(masked.contains("PROXY_SECRET=<redacted>"));
+        assert!(!masked.contains("9f8e7d6c5b4a3928"));
+    }
+
+    #[test]
+    fn crash_log_is_redacted() {
+        let dir = std::env::temp_dir().join(format!("dhakaflix-crash-redact-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("crash.log");
+        install_panic_hook(file.clone());
+        let result = std::panic::catch_unwind(|| {
+            panic!("request to https://x.ts.net/p/AbCdEfGhIjKlMnOpQrStUvWxYz0123456789 failed")
+        });
+        assert!(result.is_err());
+        let text = std::fs::read_to_string(&file).expect("crash log written");
+        assert!(!text.contains("AbCdEfGhIjKlMnOp"), "signed token leaked into crash.log");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

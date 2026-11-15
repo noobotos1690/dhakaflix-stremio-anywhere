@@ -20,24 +20,24 @@ Copyright © SixtyFPS GmbH.
 The binary links the following crates, each under its own permissive licence
 (MIT / Apache-2.0):
 
-- `slint`, `slint-build`, `i-slint-*` — Slint royalty-free licence or GPLv3
-- `tokio` — MIT
-- `serde`, `serde_json` — MIT / Apache-2.0
-- `tracing`, `tracing-subscriber`, `tracing-core` — MIT
-- `chrono` — MIT / Apache-2.0
-- `windows-sys` — MIT / Apache-2.0
-- `winres` — MIT
+- `slint`, `slint-build`, `i-slint-*` - Slint royalty-free licence or GPLv3
+- `tokio` - MIT
+- `serde`, `serde_json` - MIT / Apache-2.0
+- `tracing`, `tracing-subscriber`, `tracing-core` - MIT
+- `chrono` - MIT / Apache-2.0
+- `windows-sys` - MIT / Apache-2.0
+- `winres` - MIT
 
 ## Bundled runtime components
 
 `desktop-rust\build.ps1` copies these into the payload shipped inside the
 installer, the single-file portable exe and the portable zip:
 
-- **Node.js** — MIT-style Node.js licence. Copied from the build machine as
+- **Node.js** - MIT-style Node.js licence. Copied from the build machine as
   `runtime\node` (node.exe plus npm).
-- **npm packages** from `package.json` — axios, cheerio, stremio-addon-sdk and
+- **npm packages** from `package.json` - axios, cheerio, stremio-addon-sdk and
   their dependencies as `node_modules`, installed with `npm install --omit=dev`.
-- **cloudflared** — Apache-2.0, as `tools\cloudflared.exe`; used only by the
+- **cloudflared** - Apache-2.0, as `tools\cloudflared.exe`; used only by the
   Cloudflare Quick Tunnel mode.
 
 The app still fetches them when one is missing: Node.js from nodejs.org

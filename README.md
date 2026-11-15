@@ -2,7 +2,7 @@
 
 A Stremio addon for the DhakaFlix mirrors on [BDIX](https://bdix.net/) (Bangladesh),
 with a built-in **public relay** so the addon can be installed and watched from
-anywhere — not just from a device inside your ISP's network.
+anywhere - not just from a device inside your ISP's network.
 
 > **Fork notice**
 > This repository is a fork of
@@ -12,7 +12,7 @@ anywhere — not just from a device inside your ISP's network.
 > Docker deployment kit and the documentation needed to run it as a server.
 >
 > **Want the internals?** [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md) explains the
-> whole path from pressing play to bytes arriving — including why a normal cloud
+> whole path from pressing play to bytes arriving - including why a normal cloud
 > host cannot work.
 
 ---
@@ -46,7 +46,7 @@ resume work exactly as before.
 
 ---
 
-## Quick start (Windows — double-click)
+## Quick start (Windows - double-click)
 
 Requires [Node.js 18+](https://nodejs.org/) (LTS). Everything else is automatic.
 
@@ -148,7 +148,7 @@ All wrappers are thin PowerShell entry points; run them directly if you prefer.
 
 | Command | Purpose |
 | --- | --- |
-| `setup.cmd` | one-time setup (idempotent — safe to re-run) |
+| `setup.cmd` | one-time setup (idempotent - safe to re-run) |
 | `start.cmd` | run in the foreground; `Ctrl+C` stops it |
 | `start.cmd -Background` | run detached, logs to `logs\relay.log` |
 | `start.cmd -Open` | also open the install page in your browser |
@@ -180,7 +180,7 @@ restart, so treat this as a trial mode.
 For an addon you install once and keep, you need a hostname you control. Two
 options, both supported:
 
-### Option A — named Cloudflare tunnel on a BDIX machine
+### Option A - named Cloudflare tunnel on a BDIX machine
 
 Any always-on machine inside a BDIX network (your PC, a home server, a BDIX VPS)
 works.
@@ -196,7 +196,7 @@ cloudflared tunnel token dhakaflix      # copy this token
 PUBLIC_URL=https://flix.example.com TUNNEL_TOKEN=<token> npm start
 ```
 
-### Option B — Docker on a BDIX-peered VPS
+### Option B - Docker on a BDIX-peered VPS
 
 ```bash
 cp .env.example .env      # set PROXY_SECRET and PUBLIC_URL
@@ -209,7 +209,7 @@ docker compose --profile tunnel up -d             # + stable tunnel
 > fails. The host must be on a network that reaches the mirrors.
 
 
-### Option C — Tailscale Funnel (no domain, desktop app)
+### Option C - Tailscale Funnel (no domain, desktop app)
 
 The Windows desktop app can publish the relay through Tailscale Funnel:
 
@@ -224,12 +224,7 @@ The Windows desktop app can publish the relay through Tailscale Funnel:
   `dhakaflix.dpdns.org` is not attached to Funnel. Tailscale also limits
   sustained video bandwidth.
 
-Open **Public access → Tailscale Funnel** in the dashboard, click **Connect** if
-needed, then **Enable Funnel**. The step-by-step walkthrough is below.
-
-### Tailscale setup, step by step
-
-Everything here is done once, on the machine that runs the relay.
+Everything below is done once, on the machine that runs the relay.
 
 1. Install Tailscale from <https://tailscale.com/download/windows> and open it.
 2. Sign in with the account that owns the tailnet and leave it connected. The
@@ -276,11 +271,11 @@ Everything is environment-driven; see [.env.example](.env.example).
 | `HOST` | `0.0.0.0` | Listen address |
 | `PUBLIC_URL` | *derived from request* | Public origin used for install and stream links |
 | `STREAM_MODE` | `proxy` | `proxy` (works anywhere), `direct` (BDIX clients only), `both` |
-| `PROXY_SECRET` | random per boot | HMAC key for relay links — **set this in production** |
+| `PROXY_SECRET` | random per boot | HMAC key for relay links - **set this in production** |
 | `PROXY_TTL` | `604800` | Relay link lifetime in seconds (7 days) |
 | `MAX_PROXY_STREAMS` | `8` | Concurrent relayed playback sessions |
 | `TUNNEL` | `0` | `1` starts a quick tunnel |
-| `TUNNEL_TOKEN` | – | Starts a named tunnel |
+| `TUNNEL_TOKEN` | - | Starts a named tunnel |
 | `LOG_LEVEL` | `info` | `error`, `warn`, `info`, `debug` |
 
 `STREAM_MODE=both` is handy if you watch sometimes on BDIX and sometimes away:
@@ -299,18 +294,18 @@ the relayed stream is listed first, the direct BDIX address second.
 
 ## How it works
 
-- **Signed relay tokens** — `/p/<token>` carries the upstream URL plus an
+- **Signed relay tokens** - `/p/<token>` carries the upstream URL plus an
   expiry and an HMAC. Tokens cannot be edited into an open proxy, and targets
   are additionally restricted to the provider origins, so the relay cannot be
   used to fetch arbitrary hosts (no SSRF).
-- **Range passthrough** — `Range`/`Content-Range`/`Accept-Ranges` are forwarded
+- **Range passthrough** - `Range`/`Content-Range`/`Accept-Ranges` are forwarded
   verbatim, so players can seek without downloading from the start.
-- **Mirror health** — mirrors are TCP-probed at boot and every 5 minutes. A dead
+- **Mirror health** - mirrors are TCP-probed at boot and every 5 minutes. A dead
   mirror (`.9` is frequently down) is skipped for 5 minutes instead of costing
   every search its full timeout. This took a cold metadata request from ~26s
   to ~3.5s.
-- **Caching** — search results 12h, streams 24h, in memory.
-- **Origin rewriting** — stream URLs are emitted relative and made absolute
+- **Caching** - search results 12h, streams 24h, in memory.
+- **Origin rewriting** - stream URLs are emitted relative and made absolute
   per request from the actual `Host`/`X-Forwarded-*` headers, so the same code
   works on localhost, a tunnel URL, or your own domain with no reconfiguration.
 
@@ -327,7 +322,7 @@ read, a mid-file seek, and that forged tokens are rejected.
 ## Security notes
 
 - The relay is public by design: anyone with the manifest URL can use it. Keep
-  `MAX_PROXY_STREAMS` modest — a home upload link saturates quickly.
+  `MAX_PROXY_STREAMS` modest - a home upload link saturates quickly.
 - Set `PROXY_SECRET`. Without it a new secret is generated at boot and all
   previously issued stream links stop working.
 - Relay links are bearer tokens for a single file until they expire; rotate
@@ -342,7 +337,7 @@ read, a mid-file seek, and that forged tokens are rejected.
 | Streams play, no video | Host cannot reach `172.16.50.x`. Check `/health`. |
 | `cloudflared not found` | Run `npm run tunnel:install` or set `CLOUDFLARED_PATH`. |
 | Addon installs but shows nothing | Titles must exist on a reachable mirror; try a popular one. |
-| Seek restarts from zero | A proxy stripped `Range` — the relay itself passes it through. |
+| Seek restarts from zero | A proxy stripped `Range` - the relay itself passes it through. |
 | Links broke after restart | `PROXY_SECRET` unset; set it to keep tokens stable. |
 
 ## Project layout
@@ -383,7 +378,7 @@ website first:
 
 The script renames the upstream remote to `upstream`, points `origin` at your
 fork, commits any pending work and pushes. The first run opens a browser window
-so you can sign in to GitHub — after that the credential is cached and later
+so you can sign in to GitHub - after that the credential is cached and later
 pushes need no interaction.
 
 ```
@@ -415,5 +410,5 @@ npm run dev
   hostname.
 - `pkg` was dropped from `devDependencies`; it was only used for one-off binary
   builds and is easy to add back if you want a standalone `.exe`.
-- `tools/`, `logs/`, `.run/` and `.env` are gitignored — never commit your relay
+- `tools/`, `logs/`, `.run/` and `.env` are gitignored - never commit your relay
   secret or the 55 MB tunnel binary.
