@@ -1,0 +1,126 @@
+import { Theme } from "../theme.slint";
+import { Panel, PageHeader, PrimaryButton, DiagItem, DiagRow, MirrorRow } from "../components.slint";
+
+export component DiagnosticsPage inherits Rectangle {
+    in property <[DiagRow]> checks;
+    in property <[MirrorRow]> mirrors;
+    in property <string> summary;
+    in property <bool> busy: false;
+
+    callback refresh();
+    callback open-logs();
+
+    background: transparent;
+
+    VerticalLayout {
+        spacing: Theme.s-4;
+
+        Rectangle {
+            height: 46px;
+            background: transparent;
+
+            HorizontalLayout {
+                spacing: Theme.s-4;
+
+                PageHeader {
+                    horizontal-stretch: 1;
+                    headline: "Diagnostics";
+                    subtitle: summary;
+                }
+
+                PrimaryButton {
+                    caption: "Refresh";
+                    enabled: !busy;
+                    busy: busy;
+                    clicked => { root.refresh(); }
+                }
+            }
+        }
+
+        Panel {
+            headline: "Checks";
+            hint: "Measured now, not cached";
+            vertical-stretch: 1;
+
+            if checks.length == 0 : Rectangle {
+                vertical-stretch: 1;
+                Text {
+                    x: 12px;
+                    y: 10px;
+                    text: "Run a check to inspect this machine.";
+                    color: Theme.text-3;
+                    font-family: Theme.font;
+                    font-size: Theme.t-body;
+                }
+            }
+
+            if checks.length > 0 : Rectangle {
+                vertical-stretch: 1;
+                VerticalLayout {
+                    for row in checks : DiagItem {
+                        label: row.label;
+                        detail: row.detail;
+                        value: row.value;
+                        state: row.state;
+                    }
+                }
+            }
+        }
+
+        Panel {
+            headline: "BDIX mirrors";
+            hint: "Reachability reported by the relay";
+            height: 128px;
+            vertical-stretch: 0;
+
+            HorizontalLayout {
+                height: 100%;
+                spacing: Theme.s-5;
+
+                for mirror in mirrors : VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 4px;
+
+                    HorizontalLayout {
+                        spacing: 7px;
+                        Rectangle {
+                            width: 6px;
+                            height: 6px;
+                            border-radius: 3px;
+                            background: mirror.state == "ok" ? Theme.success
+                                : mirror.state == "error" ? Theme.error
+                                : Theme.idle;
+                        }
+                        Text {
+                            text: mirror.name;
+                            color: Theme.text;
+                            font-family: Theme.font;
+                            font-size: Theme.t-body;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                    }
+
+                    Text {
+                        text: mirror.host;
+                        color: Theme.text-3;
+                        font-family: Theme.mono;
+                        font-size: Theme.t-caption;
+                        overflow: elide;
+                    }
+
+                    Text {
+                        text: mirror.state == "ok" ? "Reachable"
+                            : mirror.state == "error" ? "Offline"
+                            : "Not probed yet";
+                        color: mirror.state == "ok" ? Theme.success
+                            : mirror.state == "error" ? Theme.error
+                            : Theme.text-3;
+                        font-family: Theme.font;
+                        font-size: Theme.t-caption;
+                    }
+                }
+            }
+        }
+    }
+}

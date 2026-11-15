@@ -1,0 +1,114 @@
+import { Theme } from "../theme.slint";
+import {
+    PageHeader, SegmentedOption, SecondaryButton, TextField, LogList, LogRow,
+} from "../components.slint";
+
+export component LogsPage inherits Rectangle {
+    in property <[LogRow]> rows;
+    in property <int> tick: 0;
+    in property <string> level: "all";
+    in-out property <string> search: "";
+    in property <int> shown: 0;
+    in property <int> total: 0;
+    in-out property <bool> follow: true;
+
+    callback set-level(string);
+    callback set-search(string);
+    callback toggle-follow();
+    callback clear-logs();
+    callback copy-logs();
+    callback open-logs();
+
+    background: transparent;
+
+    VerticalLayout {
+        spacing: Theme.s-3;
+
+        Rectangle {
+            height: 46px;
+            background: transparent;
+
+            PageHeader {
+                headline: "Logs";
+                subtitle: shown + " of " + total + " entries shown. Relay output and app events, newest last.";
+            }
+        }
+
+        // ----------------------------------------------------------- toolbar
+        Rectangle {
+            height: 38px;
+            background: transparent;
+
+            HorizontalLayout {
+                spacing: Theme.s-2;
+
+                HorizontalLayout {
+                    spacing: 4px;
+                    SegmentedOption { caption: "All"; selected: level == "all"; clicked => { root.set-level("all"); } }
+                    SegmentedOption { caption: "Info"; selected: level == "info"; clicked => { root.set-level("info"); } }
+                    SegmentedOption { caption: "Warn"; selected: level == "warn"; clicked => { root.set-level("warn"); } }
+                    SegmentedOption { caption: "Error"; selected: level == "error"; clicked => { root.set-level("error"); } }
+                }
+
+                TextField {
+                    field-width: 220px;
+                    placeholder: "Filter text";
+                    value <=> root.search;
+                    edited(value) => { root.set-search(value); }
+                }
+
+                Rectangle { horizontal-stretch: 1; }
+
+                SecondaryButton {
+                    caption: follow ? "Following" : "Follow";
+                    compact: true;
+                    clicked => { root.toggle-follow(); }
+                }
+                SecondaryButton {
+                    caption: "Copy";
+                    compact: true;
+                    clicked => { root.copy-logs(); }
+                }
+                SecondaryButton {
+                    caption: "Clear";
+                    compact: true;
+                    clicked => { root.clear-logs(); }
+                }
+                SecondaryButton {
+                    caption: "Folder";
+                    compact: true;
+                    clicked => { root.open-logs(); }
+                }
+            }
+        }
+
+        // -------------------------------------------------------------- list
+        Rectangle {
+            vertical-stretch: 1;
+            background: Theme.bg;
+            border-radius: Theme.r-lg;
+            border-width: 1px;
+            border-color: Theme.divider;
+            clip: true;
+
+            if rows.length == 0 : Rectangle {
+                Text {
+                    x: Theme.s-4;
+                    y: Theme.s-4;
+                    text: total == 0
+                        ? "No output yet. Start the relay and its log lines appear here."
+                        : "No entries match this filter.";
+                    color: Theme.text-3;
+                    font-family: Theme.font;
+                    font-size: Theme.t-body;
+                }
+            }
+
+            if rows.length > 0 : LogList {
+                entries: root.rows;
+                tick: root.tick;
+                follow <=> root.follow;
+            }
+        }
+    }
+}

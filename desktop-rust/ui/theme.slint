@@ -1,0 +1,62 @@
+// Design tokens. Every colour, radius and spacing value used by the interface
+// comes from here so the whole app stays consistent.
+//
+// Dark, low-chroma surfaces with one purple accent reserved for selection and
+// primary actions. Success / warning / error appear only on status affordances.
+
+export global Theme {
+    // Surfaces
+    out property <color> bg: #0f1016;
+    out property <color> sidebar: #14151d;
+    out property <color> surface: #191b24;
+    out property <color> surface-2: #1f2130;
+    out property <color> raised: #262a3a;
+    out property <color> hover: #20222f;
+
+    // Accent
+    out property <color> accent: #7957d5;
+    out property <color> accent-hover: #8c70e8;
+    out property <color> accent-press: #6a4ac2;
+    out property <color> accent-soft: #262138;
+    out property <color> accent-line: #4d3a8c;
+
+    // Text
+    out property <color> text: #f3f1f8;
+    out property <color> text-2: #a7a7b8;
+    out property <color> text-3: #767889;
+    out property <color> text-4: #5b5d6d;
+    out property <color> on-accent: #ffffff;
+
+    // Lines
+    out property <color> border: #2b2d3c;
+    out property <color> border-strong: #3a3d50;
+    out property <color> divider: #242633;
+
+    // Status
+    out property <color> success: #6fbf8e;
+    out property <color> warning: #ddb16a;
+    out property <color> error: #e07a7a;
+    out property <color> idle: #6a6c7d;
+
+    // Radii
+    out property <length> r-xs: 3px;
+    out property <length> r-sm: 4px;
+    out property <length> r-md: 6px;
+    out property <length> r-lg: 8px;
+
+    // Spacing scale
+    out property <length> s-1: 4px;
+    out property <length> s-2: 8px;
+    out property <length> s-3: 12px;
+    out property <length> s-4: 16px;
+    out property <length> s-5: 20px;
+    out property <length> s-6: 26px;
+
+    // Type
+    out property <string> font: "Segoe UI";
+    out property <string> mono: "Cascadia Mono";
+    out property <length> t-caption: 11px;
+    out property <length> t-body: 12px;
+    out property <length> t-body-lg: 13px;
+    out property <length> t-title: 19px;
+}

@@ -1,0 +1,342 @@
+import { Theme } from "theme.slint";
+import {
+    BrandMark, NavItem, StatusDot, ConfirmDialog, Toast,
+    LogRow, DiagRow, MirrorRow, ServiceInfo, EndpointInfo, CloudflareInfo, TailscaleInfo, PrefsInfo,
+} from "components.slint";
+import { OverviewPage } from "pages/overview.slint";
+import { PublicAccessPage } from "pages/public-access.slint";
+import { DiagnosticsPage } from "pages/diagnostics.slint";
+import { LogsPage } from "pages/logs.slint";
+import { SettingsPage } from "pages/settings.slint";
+
+export { TrayMenu } from "tray.slint";
+
+export component MainWindow inherits Window {
+    title: "DhakaFlix Relay";
+    width: 1160px;
+    height: 760px;
+    background: Theme.bg;
+    default-font-family: Theme.font;
+    default-font-size: Theme.t-body;
+
+    // ------------------------------------------------------------- state
+    in-out property <int> page: 0;
+
+    in property <ServiceInfo> service;
+    in property <EndpointInfo> endpoint;
+    in property <CloudflareInfo> cloudflare;
+    in property <TailscaleInfo> tailscale;
+    in property <[DiagRow]> checks;
+    in property <[MirrorRow]> mirrors;
+    in property <string> diag-summary;
+    in property <[LogRow]> logs;
+    in property <[LogRow]> recent;
+    in property <PrefsInfo> prefs;
+
+    in-out property <string> port-text;
+    in-out property <string> max-streams-text;
+    in-out property <bool> log-follow: true;
+    in property <string> log-level: "all";
+    in-out property <string> log-search;
+    in property <int> log-shown: 0;
+    in property <int> log-total: 0;
+    in property <int> log-tick: 0;
+
+    in property <bool> busy: false;
+    in property <bool> diag-busy: false;
+
+    in property <bool> toast-visible: false;
+    in property <string> toast-text: "";
+    in property <string> toast-kind: "info";
+
+    in property <bool> confirm-visible: false;
+    in property <string> confirm-title: "";
+    in property <string> confirm-body: "";
+    in property <string> confirm-label: "Confirm";
+    in property <bool> confirm-danger: false;
+    in property <string> confirm-secondary-text: "";
+
+    // --------------------------------------------------------- callbacks
+    callback start-relay();
+    callback stop-relay();
+    callback restart-relay();
+    callback copy-manifest();
+    callback copy-endpoint();
+    callback open-endpoint();
+    callback install-stremio();
+    callback open-logs-page();
+    callback open-logs-folder();
+    callback check-updates();
+
+    callback select-provider(string);
+    callback cf-start();
+    callback cf-stop();
+    callback ts-install();
+    callback ts-connect();
+    callback ts-enable();
+    callback ts-disable();
+    callback ts-refresh();
+    callback open-admin();
+    callback open-funnel-docs();
+    callback open-download();
+
+    callback refresh-diagnostics();
+
+    callback set-log-level(string);
+    callback set-log-search(string);
+    callback toggle-follow();
+    callback clear-logs();
+    callback copy-logs();
+
+    callback set-startup(bool);
+    callback set-auto-start(bool);
+    callback set-tray(bool);
+    callback save-settings();
+    callback open-config();
+    callback repair-dependencies();
+    callback reset-preferences();
+
+    callback confirm();
+    callback cancel();
+    callback confirm-secondary();
+
+    // ------------------------------------------------------------ shell
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        background: Theme.bg;
+
+        HorizontalLayout {
+            spacing: 0;
+
+            // ------------------------------------------------- sidebar
+            Rectangle {
+                width: 212px;
+                background: Theme.sidebar;
+
+                Rectangle {
+                    x: parent.width - 1px;
+                    width: 1px;
+                    height: 100%;
+                    background: Theme.divider;
+                }
+
+                VerticalLayout {
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    padding-top: 16px;
+                    padding-bottom: 14px;
+                    spacing: 6px;
+
+                    HorizontalLayout {
+                        height: 40px;
+                        spacing: 10px;
+
+                        BrandMark { mark-size: 26px; }
+
+                        VerticalLayout {
+                            spacing: 1px;
+                            Text {
+                                text: "DhakaFlix";
+                                color: Theme.text;
+                                font-family: Theme.font;
+                                font-size: 13px;
+                                font-weight: 600;
+                                letter-spacing: 0.2px;
+                            }
+                            Text {
+                                text: "RELAY";
+                                color: Theme.text-3;
+                                font-family: Theme.font;
+                                font-size: 9px;
+                                font-weight: 600;
+                                letter-spacing: 1.6px;
+                            }
+                        }
+                    }
+
+                    Rectangle { height: 8px; background: transparent; }
+
+                    NavItem {
+                        caption: "Overview";
+                        icon: "overview";
+                        selected: root.page == 0;
+                        clicked => { root.page = 0; }
+                    }
+                    NavItem {
+                        caption: "Public access";
+                        icon: "globe";
+                        selected: root.page == 1;
+                        clicked => { root.page = 1; }
+                    }
+                    NavItem {
+                        caption: "Diagnostics";
+                        icon: "pulse";
+                        selected: root.page == 2;
+                        clicked => { root.page = 2; }
+                    }
+                    NavItem {
+                        caption: "Logs";
+                        icon: "logs";
+                        selected: root.page == 3;
+                        clicked => { root.page = 3; }
+                    }
+                    NavItem {
+                        caption: "Settings";
+                        icon: "settings";
+                        selected: root.page == 4;
+                        clicked => { root.page = 4; }
+                    }
+
+                    Rectangle { vertical-stretch: 1; background: transparent; }
+
+                    Rectangle {
+                        height: 1px;
+                        background: Theme.divider;
+                    }
+
+                    Rectangle {
+                        height: 38px;
+                        background: transparent;
+
+                        HorizontalLayout {
+                            spacing: 7px;
+
+                            VerticalLayout {
+                                spacing: 1px;
+                                Text {
+                                    text: root.service.running ? "Relay online" : "Relay offline";
+                                    color: Theme.text-2;
+                                    font-family: Theme.font;
+                                    font-size: Theme.t-caption;
+                                }
+                                Text {
+                                    text: "port " + root.service.port + "  ·  v" + root.service.version;
+                                    color: Theme.text-4;
+                                    font-family: Theme.mono;
+                                    font-size: 10px;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // -------------------------------------------------- content
+            Rectangle {
+                horizontal-stretch: 1;
+                background: Theme.bg;
+
+                VerticalLayout {
+                    padding-left: 24px;
+                    padding-right: 24px;
+                    padding-top: 18px;
+                    padding-bottom: 20px;
+
+                    if page == 0 : OverviewPage {
+                        service: root.service;
+                        endpoint: root.endpoint;
+                        recent: root.recent;
+                        busy: root.busy;
+                        start-relay => { root.start-relay(); }
+                        stop-relay => { root.stop-relay(); }
+                        restart-relay => { root.restart-relay(); }
+                        copy-manifest => { root.copy-manifest(); }
+                        open-endpoint => { root.open-endpoint(); }
+                        install-stremio => { root.install-stremio(); }
+                        open-logs => { root.open-logs-page(); }
+                    }
+
+                    if page == 1 : PublicAccessPage {
+                        provider: root.prefs.provider;
+                        cloudflare: root.cloudflare;
+                        tailscale: root.tailscale;
+                        busy: root.busy;
+                        select-provider(value) => { root.select-provider(value); }
+                        cf-start => { root.cf-start(); }
+                        cf-stop => { root.cf-stop(); }
+                        ts-install => { root.ts-install(); }
+                        ts-connect => { root.ts-connect(); }
+                        ts-enable => { root.ts-enable(); }
+                        ts-disable => { root.ts-disable(); }
+                        ts-refresh => { root.ts-refresh(); }
+                        copy-endpoint => { root.copy-endpoint(); }
+                        open-endpoint => { root.open-endpoint(); }
+                        open-admin => { root.open-admin(); }
+                        open-download => { root.open-download(); }
+                        open-funnel-docs => { root.open-funnel-docs(); }
+                    }
+
+                    if page == 2 : DiagnosticsPage {
+                        checks: root.checks;
+                        mirrors: root.mirrors;
+                        summary: root.diag-summary;
+                        busy: root.diag-busy;
+                        refresh => { root.refresh-diagnostics(); }
+                        open-logs => { root.open-logs-page(); }
+                    }
+
+                    if page == 3 : LogsPage {
+                        rows: root.logs;
+                        tick: root.log-tick;
+                        level: root.log-level;
+                        search: root.log-search;
+                        shown: root.log-shown;
+                        total: root.log-total;
+                        follow <=> root.log-follow;
+                        set-level(value) => { root.set-log-level(value); }
+                        set-search(value) => { root.set-log-search(value); }
+                        toggle-follow => { root.toggle-follow(); }
+                        clear-logs => { root.clear-logs(); }
+                        copy-logs => { root.copy-logs(); }
+                        open-logs => { root.open-logs-folder(); }
+                    }
+
+                    if page == 4 : SettingsPage {
+                        prefs: root.prefs;
+                        provider: root.prefs.provider;
+                        log-level: root.prefs.log-level;
+                        busy: root.busy;
+                        port-text <=> root.port-text;
+                        max-streams-text <=> root.max-streams-text;
+                        set-startup(value) => { root.set-startup(value); }
+                        set-auto-start(value) => { root.set-auto-start(value); }
+                        set-tray(value) => { root.set-tray(value); }
+                        select-provider(value) => { root.select-provider(value); }
+                        set-log-level(value) => { root.set-log-level(value); }
+                        save => { root.save-settings(); }
+                        open-config => { root.open-config(); }
+                        open-logs => { root.open-logs-folder(); }
+                        repair => { root.repair-dependencies(); }
+                        reset-prefs => { root.reset-preferences(); }
+                        check-updates => { root.check-updates(); }
+                    }
+                }
+            }
+        }
+
+        // ---------------------------------------------------------- toast
+        Toast {
+            x: parent.width - self.width - 24px;
+            y: parent.height - self.height - 22px;
+            shown: root.toast-visible;
+            message: root.toast-text;
+            kind: root.toast-kind;
+        }
+
+        // -------------------------------------------------------- confirm
+        ConfirmDialog {
+            width: 100%;
+            height: 100%;
+            shown: root.confirm-visible;
+            headline: root.confirm-title;
+            body: root.confirm-body;
+            confirm-text: root.confirm-label;
+            danger: root.confirm-danger;
+            secondary-text: root.confirm-secondary-text;
+            confirmed => { root.confirm(); }
+            cancelled => { root.cancel(); }
+            secondary => { root.confirm-secondary(); }
+        }
+    }
+}

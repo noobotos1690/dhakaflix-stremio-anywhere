@@ -1,0 +1,289 @@
+import { Theme } from "../theme.slint";
+import {
+    Panel, PageHeader, ProviderOption, StatusDot, PrimaryButton, SecondaryButton, DangerButton,
+    LinkButton, EndpointField, Note, CloudflareInfo, TailscaleInfo,
+} from "../components.slint";
+
+export component PublicAccessPage inherits Rectangle {
+    in property <string> provider: "cloudflare";
+    in property <CloudflareInfo> cloudflare;
+    in property <TailscaleInfo> tailscale;
+    in property <bool> busy: false;
+
+    callback select-provider(string);
+    callback cf-start();
+    callback cf-stop();
+    callback ts-install();
+    callback ts-connect();
+    callback ts-enable();
+    callback ts-disable();
+    callback ts-refresh();
+    callback copy-endpoint();
+    callback open-endpoint();
+    callback open-admin();
+    callback open-download();
+    callback open-funnel-docs();
+
+    background: transparent;
+
+    VerticalLayout {
+        spacing: Theme.s-4;
+
+        // ------------------------------------------------------------ header
+        Rectangle {
+            height: 46px;
+            background: transparent;
+
+            PageHeader {
+                headline: "Public access";
+                subtitle: "Choose how Stremio reaches this relay from outside your network.";
+            }
+        }
+
+        // ------------------------------------------------- provider selector
+        HorizontalLayout {
+            height: 64px;
+            spacing: Theme.s-2;
+
+            ProviderOption {
+                headline: "Cloudflare Quick Tunnel";
+                summary: "Random trycloudflare.com address on every start. No account needed.";
+                selected: root.provider == "cloudflare";
+                clicked => { root.select-provider("cloudflare"); }
+            }
+
+            ProviderOption {
+                headline: "Tailscale Funnel";
+                summary: "Stable ts.net address that survives restarts. Needs Tailscale signed in.";
+                selected: root.provider == "tailscale";
+                clicked => { root.select-provider("tailscale"); }
+            }
+        }
+
+        // -------------------------------------------------------- cloudflare
+        if provider == "cloudflare" : Panel {
+            headline: "Cloudflare Quick Tunnel";
+            hint: "Selected provider";
+            vertical-stretch: 1;
+
+            HorizontalLayout {
+                height: 22px;
+                spacing: Theme.s-2;
+                StatusDot { kind: cloudflare.kind; }
+                Text {
+                    text: cloudflare.status-text;
+                    color: Theme.text;
+                    font-family: Theme.font;
+                    font-size: Theme.t-body-lg;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            EndpointField {
+                label: "Hostname";
+                value: cloudflare.hostname;
+                placeholder: "Waiting for cloudflared…";
+                tone: cloudflare.kind == "error" ? "error" : "normal";
+            }
+
+            EndpointField {
+                label: "Manifest URL";
+                value: cloudflare.manifest;
+                placeholder: "No public hostname yet";
+                tone: cloudflare.kind == "error" ? "error" : "normal";
+
+                SecondaryButton {
+                    caption: "Copy";
+                    compact: true;
+                    enabled: cloudflare.has-url;
+                    clicked => { root.copy-endpoint(); }
+                }
+                SecondaryButton {
+                    caption: "Open";
+                    compact: true;
+                    enabled: cloudflare.has-url;
+                    clicked => { root.open-endpoint(); }
+                }
+            }
+
+            EndpointField {
+                label: "Public URL";
+                value: cloudflare.public-url;
+                placeholder: "Waiting for tunnel to start…";
+                tone: cloudflare.kind == "error" ? "error" : "normal";
+            }
+
+            Note {
+                kind: "warn";
+                body: "The hostname changes every time the tunnel restarts, so an installed addon stops working. Remove the addon from Stremio before switching to a new address.";
+            }
+
+            if cloudflare.detail != "" : Note {
+                kind: cloudflare.kind == "error" ? "error" : "info";
+                body: cloudflare.detail;
+            }
+
+            Rectangle { vertical-stretch: 1; background: transparent; }
+
+            Rectangle {
+                height: 32px;
+                background: transparent;
+                HorizontalLayout {
+                    spacing: Theme.s-2;
+                    Text {
+                        horizontal-stretch: 1;
+                        text: "cloudflared is installed and managed by this app.";
+                        color: Theme.text-3;
+                        font-family: Theme.font;
+                        font-size: Theme.t-caption;
+                        vertical-alignment: center;
+                    }
+                    if cloudflare.running : DangerButton {
+                        caption: "Stop tunnel";
+                        enabled: !busy;
+                        busy: busy;
+                        clicked => { root.cf-stop(); }
+                    }
+                    if !cloudflare.running : PrimaryButton {
+                        caption: "Start tunnel";
+                        enabled: !busy;
+                        busy: busy;
+                        clicked => { root.cf-start(); }
+                    }
+                }
+            }
+        }
+
+        // --------------------------------------------------------- tailscale
+        if provider == "tailscale" : Panel {
+            headline: "Tailscale Funnel";
+            hint: "Selected provider";
+            vertical-stretch: 1;
+
+            HorizontalLayout {
+                height: 22px;
+                spacing: Theme.s-2;
+                StatusDot { kind: tailscale.kind; }
+                Text {
+                    text: tailscale.status-text;
+                    color: Theme.text;
+                    font-family: Theme.font;
+                    font-size: Theme.t-body-lg;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+                Rectangle { horizontal-stretch: 1; }
+                LinkButton {
+                    text: "Admin console";
+                    width: 94px;
+                    clicked => { root.open-admin(); }
+                }
+            }
+
+            EndpointField {
+                label: "Tailscale";
+                mono: false;
+                value: tailscale.installed
+                    ? (tailscale.connected ? "Installed and connected" : "Installed")
+                : "Not installed";
+                tone: tailscale.installed ? "normal" : "error";
+            }
+
+            EndpointField {
+                label: "Device";
+                mono: false;
+                value: tailscale.device;
+                placeholder: "No device name reported";
+            }
+
+            EndpointField {
+                label: "Tailnet host";
+                value: tailscale.hostname;
+                placeholder: "No HTTPS hostname yet";
+            }
+
+            EndpointField {
+                label: "Funnel";
+                mono: false;
+                value: tailscale.funnel-active
+                    ? "Serving " + tailscale.funnel-target
+                    : (tailscale.installed && tailscale.connected ? "Not enabled" : "Unavailable");
+            }
+
+            EndpointField {
+                label: "Public address";
+                value: tailscale.public-url;
+                placeholder: "Enable Funnel to get an address";
+                tone: tailscale.kind == "error" ? "error" : "normal";
+            }
+
+            EndpointField {
+                label: "Manifest URL";
+                value: tailscale.manifest;
+                placeholder: "Enable Funnel to get a manifest URL";
+
+                SecondaryButton {
+                    caption: "Copy";
+                    compact: true;
+                    enabled: tailscale.has-url;
+                    clicked => { root.copy-endpoint(); }
+                }
+                SecondaryButton {
+                    caption: "Open";
+                    compact: true;
+                    enabled: tailscale.has-url;
+                    clicked => { root.open-endpoint(); }
+                }
+            }
+
+            if tailscale.detail != "" : Note {
+                kind: tailscale.kind == "error" ? "error" : (tailscale.needs-login ? "warn" : "info");
+                body: tailscale.detail;
+            }
+
+            Note {
+                kind: "info";
+                body: "Funnel only serves ts.net addresses, so a custom domain such as dhakaflix.dpdns.org cannot be attached. Tailscale also limits bandwidth, which can slow sustained video playback.";
+            }
+
+            Rectangle { vertical-stretch: 1; background: transparent; }
+
+            Rectangle {
+                height: 32px;
+                background: transparent;
+                HorizontalLayout {
+                    spacing: Theme.s-2;
+
+                    SecondaryButton {
+                        caption: "Refresh";
+                        enabled: !busy;
+                        clicked => { root.ts-refresh(); }
+                    }
+                    if !tailscale.installed : SecondaryButton {
+                        caption: "Install Tailscale";
+                        clicked => { root.ts-install(); }
+                    }
+                    if tailscale.installed && !tailscale.connected && !busy : PrimaryButton {
+                        caption: "Connect";
+                        busy: busy;
+                        clicked => { root.ts-connect(); }
+                    }
+                    Rectangle { horizontal-stretch: 1; }
+                    if tailscale.funnel-active : DangerButton {
+                        caption: "Disable Funnel";
+                        enabled: !busy;
+                        busy: busy;
+                        clicked => { root.ts-disable(); }
+                    }
+                    if !tailscale.funnel-active : PrimaryButton {
+                        caption: "Enable Funnel";
+                        enabled: tailscale.connected && !busy;
+                        busy: busy;
+                        clicked => { root.ts-enable(); }
+                    }
+                }
+            }
+        }
+    }
+}

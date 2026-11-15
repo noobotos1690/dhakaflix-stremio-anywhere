@@ -1,0 +1,1227 @@
+// Shared interface pieces. Every one of them reads its colours, radii and
+// spacing from the Theme global so states stay consistent across pages.
+
+import { Theme } from "theme.slint";
+
+export struct LogRow {
+    time: string,
+    level: string,
+    text: string,
+}
+
+export struct DiagRow {
+    label: string,
+    detail: string,
+    value: string,
+    state: string,
+}
+
+export struct MirrorRow {
+    name: string,
+    host: string,
+    state: string,
+}
+
+export struct ServiceInfo {
+    running: bool,
+    external: bool,
+    status-text: string,
+    status-kind: string,
+    uptime: string,
+    node-version: string,
+    node-ok: bool,
+    health-text: string,
+    health-kind: string,
+    mirrors-online: int,
+    mirrors-total: int,
+    sessions: int,
+    sessions-max: int,
+    detail: string,
+    stream-mode: string,
+    port: int,
+    version: string,
+}
+
+export struct EndpointInfo {
+    provider: string,
+    host: string,
+    manifest: string,
+    local: string,
+    kind: string,
+    note: string,
+    has-url: bool,
+}
+
+export struct CloudflareInfo {
+    selected: bool,
+    running: bool,
+    hostname: string,
+    manifest: string,
+    status-text: string,
+    kind: string,
+    detail: string,
+    has-url: bool,
+    public-url: string,
+}
+
+export struct TailscaleInfo {
+    selected: bool,
+    installed: bool,
+    service-running: bool,
+    connected: bool,
+    needs-login: bool,
+    device: string,
+    hostname: string,
+    funnel-active: bool,
+    funnel-target: string,
+    public-url: string,
+    manifest: string,
+    status-text: string,
+    kind: string,
+    detail: string,
+    has-url: bool,
+}
+
+export struct PrefsInfo {
+    startup: bool,
+    auto-start: bool,
+    minimize-to-tray: bool,
+    provider: string,
+    port-text: string,
+    max-streams-text: string,
+    log-level: string,
+    config-dir: string,
+    logs-dir: string,
+    version: string,
+}
+
+// --------------------------------------------------------------------- atoms
+
+export component StatusDot inherits Rectangle {
+    in property <string> kind: "idle";
+    in property <length> dot-size: 7px;
+    width: self.dot-size;
+    height: self.dot-size;
+    border-radius: self.width / 2;
+    background: kind == "ok" ? Theme.success
+        : kind == "warn" ? Theme.warning
+        : kind == "error" ? Theme.error
+        : kind == "accent" ? Theme.accent
+        : Theme.idle;
+}
+
+export component Icon inherits Path {
+    in property <string> kind: "overview";
+    in property <color> tint: Theme.text-3;
+    in property <length> icon-size: 16px;
+
+    width: self.icon-size;
+    height: self.icon-size;
+    viewbox-width: 24;
+    viewbox-height: 24;
+    stroke: self.tint;
+    stroke-width: 1.6px;
+    fill: transparent;
+    stroke-line-cap: round;
+    stroke-line-join: round;
+    commands: kind == "overview"
+        ? "M4 4 H10 V10 H4 Z M14 4 H20 V10 H14 Z M4 14 H10 V20 H4 Z M14 14 H20 V20 H14 Z"
+        : kind == "globe"
+        ? "M12 3 A9 9 0 1 0 12 21 A9 9 0 1 0 12 3 Z M3 12 H21 M12 3 C8.6 7.6 8.6 16.4 12 21 C15.4 16.4 15.4 7.6 12 3"
+        : kind == "pulse"
+        ? "M3 12 H7 L9.5 5.5 L13 18.5 L15.5 12 H21"
+        : kind == "logs"
+        ? "M4 6 H20 M4 12 H20 M4 18 H14"
+        : "M4 8 H20 M4 16 H20 M8 4.5 V11.5 M16 12.5 V19.5";
+}
+
+export component BrandMark inherits Rectangle {
+    in property <length> mark-size: 26px;
+    width: self.mark-size;
+    height: self.mark-size;
+    border-radius: Theme.r-md;
+    background: Theme.accent;
+
+    Path {
+        width: 100%;
+        height: 100%;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        fill: #ffffff;
+        commands: "M9.5 7 L17 12 L9.5 17 Z";
+    }
+}
+
+// ------------------------------------------------------------------- buttons
+
+export component PrimaryButton inherits FocusScope {
+    in property <string> caption: "OK";
+    in property <bool> compact: false;
+    in property <bool> busy: false;
+    callback clicked;
+
+    min-width: max(88px, label.preferred-width + 30px);
+    min-height: compact ? 26px : 32px;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+
+    ta := TouchArea {
+        width: 100%;
+        height: 100%;
+        mouse-cursor: root.enabled && !busy ? pointer : default;
+        clicked => {
+            if (root.enabled && !root.busy) {
+                root.clicked();
+            }
+        }
+    }
+
+    bg := Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: Theme.r-md;
+        background: Theme.accent;
+        animate background { duration: 90ms; }
+
+        states [
+            hovered when ta.has-hover && root.enabled && !root.busy: {
+                background: Theme.accent-hover;
+            }
+            pressed when ta.pressed && root.enabled && !root.busy: {
+                background: Theme.accent-press;
+            }
+            off when !root.enabled || root.busy: {
+                background: Theme.surface-2;
+            }
+        ]
+    }
+
+    ring := Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: Theme.r-md;
+        border-width: 1px;
+        border-color: root.has-focus ? Theme.accent-line : transparent;
+    }
+
+    label := Text {
+        width: 100%;
+        height: 100%;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        text: root.busy ? "Working…" : root.caption;
+        color: root.enabled && !root.busy ? Theme.on-accent : Theme.text-3;
+        font-family: Theme.font;
+        font-size: compact ? Theme.t-body - 1px : Theme.t-body;
+        font-weight: 600;
+    }
+
+    key-pressed(event) => {
+        if (!root.enabled || busy) {
+            return reject;
+        }
+        if (event.text == " " || event.text == "\n") {
+            clicked();
+            return accept;
+        }
+        return reject;
+    }
+}
+
+export component SecondaryButton inherits FocusScope {
+    in property <string> caption: "Action";
+    in property <bool> compact: false;
+    callback clicked;
+
+    min-width: max(76px, label.preferred-width + 26px);
+    min-height: compact ? 26px : 32px;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+
+    ta := TouchArea {
+        width: 100%;
+        height: 100%;
+        mouse-cursor: root.enabled ? pointer : default;
+        clicked => {
+            if (root.enabled) {
+                root.clicked();
+            }
+        }
+    }
+
+    bg := Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: Theme.r-md;
+        background: transparent;
+        border-width: 1px;
+        border-color: Theme.border;
+
+        states [
+            hovered when ta.has-hover && root.enabled: {
+                background: Theme.hover;
+                border-color: Theme.border-strong;
+            }
+            pressed when ta.pressed && root.enabled: {
+                background: Theme.surface-2;
+            }
+            off when !root.enabled: {
+                background: transparent;
+                border-color: Theme.divider;
+            }
+        ]
+    }
+
+    ring := Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: Theme.r-md;
+        border-width: 1px;
+        border-color: root.has-focus ? Theme.accent-line : transparent;
+    }
+
+    label := Text {
+        width: 100%;
+        height: 100%;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        text: root.caption;
+        color: root.enabled ? Theme.text : Theme.text-3;
+        font-family: Theme.font;
+        font-size: compact ? Theme.t-body - 1px : Theme.t-body;
+        font-weight: 500;
+    }
+
+    key-pressed(event) => {
+        if (!root.enabled) {
+            return reject;
+        }
+        if (event.text == " " || event.text == "\n") {
+            clicked();
+            return accept;
+        }
+        return reject;
+    }
+}
+
+export component DangerButton inherits FocusScope {
+    in property <string> caption: "Stop";
+    in property <bool> compact: false;
+    in property <bool> busy: false;
+    callback clicked;
+
+    min-width: max(88px, label.preferred-width + 30px);
+    min-height: compact ? 26px : 32px;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+
+    ta := TouchArea {
+        width: 100%;
+        height: 100%;
+        mouse-cursor: root.enabled && !busy ? pointer : default;
+        clicked => {
+            if (root.enabled && !root.busy) {
+                root.clicked();
+            }
+        }
+    }
+
+    bg := Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: Theme.r-md;
+        background: transparent;
+        border-width: 1px;
+        border-color: #6b3a3a;
+
+        states [
+            hovered when ta.has-hover && root.enabled && !root.busy: {
+                background: #2c1d1f;
+                border-color: Theme.error;
+            }
+            pressed when ta.pressed && root.enabled && !root.busy: {
+                background: #3a2427;
+            }
+            off when !root.enabled || root.busy: {
+                background: transparent;
+                border-color: Theme.divider;
+            }
+        ]
+    }
+
+    ring := Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: Theme.r-md;
+        border-width: 1px;
+        border-color: root.has-focus ? Theme.accent-line : transparent;
+    }
+
+    label := Text {
+        width: 100%;
+        height: 100%;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        text: root.busy ? "Working…" : root.caption;
+        color: root.enabled && !root.busy ? Theme.error : Theme.text-3;
+        font-family: Theme.font;
+        font-size: compact ? Theme.t-body - 1px : Theme.t-body;
+        font-weight: 600;
+    }
+
+    key-pressed(event) => {
+        if (!root.enabled || busy) {
+            return reject;
+        }
+        if (event.text == " " || event.text == "\n") {
+            clicked();
+            return accept;
+        }
+        return reject;
+    }
+}
+
+export component LinkButton inherits Text {
+    // Text has no `enabled`, so the link reports its own usability.
+    in property <bool> active: true;
+    callback clicked;
+
+    ta := TouchArea {
+        width: 100%;
+        height: 100%;
+        mouse-cursor: root.active ? pointer : default;
+        clicked => {
+            if (root.active) {
+                root.clicked();
+            }
+        }
+    }
+
+    opacity: root.active ? 1 : 0.45;
+
+    color: ta.has-hover ? Theme.accent-hover : Theme.accent;
+    font-family: Theme.font;
+    font-size: Theme.t-body;
+    vertical-alignment: center;
+}
+
+export component ToggleSwitch inherits FocusScope {
+    in property <string> caption: "";
+    in property <bool> checked: false;
+    callback toggled(bool);
+
+    height: 30px;
+    horizontal-stretch: 1;
+
+    ta := TouchArea {
+        width: 100%;
+        height: 100%;
+        mouse-cursor: pointer;
+        clicked => {
+            root.toggled(!root.checked);
+        }
+    }
+
+    track := Rectangle {
+        x: 0;
+        y: (parent.height - self.height) / 2;
+        width: 34px;
+        height: 18px;
+        border-radius: 9px;
+        background: root.checked ? Theme.accent : Theme.raised;
+        border-width: 1px;
+        border-color: root.checked ? Theme.accent : Theme.border;
+        animate background { duration: 120ms; }
+
+        knob := Rectangle {
+            width: 12px;
+            height: 12px;
+            y: (parent.height - self.height) / 2;
+            x: root.checked ? parent.width - self.width - 3px : 3px;
+            border-radius: 6px;
+            background: root.checked ? #ffffff : Theme.text-3;
+            animate x { duration: 120ms; easing: ease-out; }
+        }
+    }
+
+    ring := Rectangle {
+        x: -3px;
+        y: (parent.height - 24px) / 2;
+        width: 40px;
+        height: 24px;
+        border-radius: Theme.r-sm;
+        border-width: 1px;
+        border-color: root.has-focus ? Theme.accent-line : transparent;
+    }
+
+    Text {
+        x: 46px;
+        y: 0;
+        width: parent.width - 46px;
+        height: parent.height;
+        text: root.caption;
+        color: Theme.text;
+        font-family: Theme.font;
+        font-size: Theme.t-body;
+        vertical-alignment: center;
+    }
+
+    key-pressed(event) => {
+        if (event.text == " " || event.text == "\n") {
+            toggled(!checked);
+            return accept;
+        }
+        return reject;
+    }
+}
+
+export component NavItem inherits FocusScope {
+    in property <string> caption: "";
+    in property <string> icon: "overview";
+    in property <bool> selected: false;
+    callback clicked;
+
+    height: 34px;
+    horizontal-stretch: 1;
+
+    ta := TouchArea {
+        width: 100%;
+        height: 100%;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+
+    bg := Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: Theme.r-sm;
+        background: transparent;
+
+        states [
+            chosen when root.selected: {
+                background: Theme.accent-soft;
+            }
+            hovered when ta.has-hover && !root.selected: {
+                background: Theme.hover;
+            }
+        ]
+    }
+
+    if root.selected : Rectangle {
+        x: 0;
+        y: 8px;
+        width: 2px;
+        height: 18px;
+        border-radius: 1px;
+        background: Theme.accent;
+    }
+
+    ring := Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: Theme.r-sm;
+        border-width: 1px;
+        border-color: root.has-focus ? Theme.accent-line : transparent;
+    }
+
+    Icon {
+        x: 11px;
+        y: (parent.height - 16px) / 2;
+        kind: root.icon;
+        tint: root.selected ? Theme.accent-hover : Theme.text-3;
+    }
+
+    Text {
+        x: 39px;
+        y: 0;
+        width: parent.width - 47px;
+        height: parent.height;
+        text: root.caption;
+        color: root.selected ? Theme.text : Theme.text-2;
+        font-family: Theme.font;
+        font-size: Theme.t-body;
+        font-weight: root.selected ? 600 : 400;
+        vertical-alignment: center;
+    }
+
+    key-pressed(event) => {
+        if (event.text == " " || event.text == "\n") {
+            clicked();
+            return accept;
+        }
+        return reject;
+    }
+}
+
+export component TextField inherits FocusScope {
+    in-out property <string> value: "";
+    in property <string> placeholder: "";
+    in property <length> field-width: 120px;
+    in property <bool> mono: false;
+    callback edited(string);
+    callback accepted(string);
+
+    height: 30px;
+    min-width: field-width;
+    horizontal-stretch: 0;
+
+    bg := Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: Theme.r-sm;
+        background: Theme.bg;
+        border-width: 1px;
+        border-color: root.has-focus ? Theme.accent-line : Theme.border;
+        animate border-color { duration: 90ms; }
+    }
+
+    Text {
+        x: 9px;
+        y: 0;
+        width: parent.width - 18px;
+        height: parent.height;
+        text: root.placeholder;
+        color: Theme.text-4;
+        font-family: Theme.font;
+        font-size: Theme.t-body;
+        vertical-alignment: center;
+        visible: root.value == "";
+        overflow: elide;
+    }
+
+    input := TextInput {
+        x: 9px;
+        y: 0;
+        width: parent.width - 18px;
+        height: parent.height;
+        text <=> root.value;
+        single-line: true;
+        color: Theme.text;
+        font-family: root.mono ? Theme.mono : Theme.font;
+        font-size: Theme.t-body;
+        vertical-alignment: center;
+        edited => { root.edited(self.text); }
+        accepted => { root.accepted(self.text); }
+    }
+}
+
+export component SegmentedOption inherits FocusScope {
+    in property <string> caption: "";
+    in property <bool> selected: false;
+    callback clicked;
+
+    min-width: max(56px, label.preferred-width + 22px);
+    min-height: 26px;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+
+    ta := TouchArea {
+        width: 100%;
+        height: 100%;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+
+    bg := Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: Theme.r-sm;
+        background: root.selected ? Theme.accent-soft : transparent;
+        border-width: 1px;
+        border-color: root.selected ? Theme.accent-line : Theme.border;
+
+        states [
+            hovered when ta.has-hover && !root.selected: {
+                background: Theme.hover;
+                border-color: Theme.border-strong;
+            }
+        ]
+    }
+
+    ring := Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: Theme.r-sm;
+        border-width: 1px;
+        border-color: root.has-focus ? Theme.accent-line : transparent;
+    }
+
+    label := Text {
+        width: 100%;
+        height: 100%;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        text: root.caption;
+        color: root.selected ? Theme.text : Theme.text-2;
+        font-family: Theme.font;
+        font-size: Theme.t-body;
+        font-weight: root.selected ? 600 : 400;
+    }
+
+    key-pressed(event) => {
+        if (event.text == " " || event.text == "\n") {
+            clicked();
+            return accept;
+        }
+        return reject;
+    }
+}
+
+// ------------------------------------------------------------------ structure
+
+export component PageHeader inherits Rectangle {
+    in property <string> headline: "";
+    in property <string> subtitle: "";
+    height: 46px;
+    background: transparent;
+
+    VerticalLayout {
+        spacing: 2px;
+
+        Text {
+            text: root.headline;
+            color: Theme.text;
+            font-family: Theme.font;
+            font-size: Theme.t-title;
+            font-weight: 600;
+        }
+        Text {
+            text: root.subtitle;
+            color: Theme.text-3;
+            font-family: Theme.font;
+            font-size: Theme.t-body;
+            overflow: elide;
+        }
+    }
+}
+
+export component Panel inherits Rectangle {
+    in property <string> headline: "";
+    in property <string> hint: "";
+    background: Theme.surface;
+    border-radius: Theme.r-lg;
+    border-width: 1px;
+    border-color: Theme.divider;
+    vertical-stretch: 1;
+
+    VerticalLayout {
+        padding: Theme.s-4;
+        spacing: 2px;
+
+        if headline != "" : Rectangle {
+            height: 30px;
+            background: transparent;
+
+            HorizontalLayout {
+                spacing: Theme.s-2;
+                Text {
+                    text: root.headline;
+                    color: Theme.text;
+                    font-family: Theme.font;
+                    font-size: Theme.t-body-lg;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                }
+                Rectangle { horizontal-stretch: 1; }
+                Text {
+                    text: root.hint;
+                    color: Theme.text-3;
+                    font-family: Theme.font;
+                    font-size: Theme.t-caption;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        @children
+    }
+}
+
+export component Metric inherits VerticalLayout {
+    in property <string> label: "";
+    in property <string> value: "";
+    in property <string> kind: "idle";
+    spacing: 5px;
+
+    Text {
+        text: root.label;
+        color: Theme.text-3;
+        font-family: Theme.font;
+        font-size: Theme.t-caption;
+        letter-spacing: 0.4px;
+    }
+
+    HorizontalLayout {
+        spacing: 7px;
+        StatusDot { kind: root.kind; }
+        Text {
+            text: root.value;
+            color: Theme.text;
+            font-family: Theme.font;
+            font-size: Theme.t-body-lg;
+            font-weight: 500;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export component Note inherits Rectangle {
+    in property <string> body: "";
+    in property <string> kind: "info";
+
+    height: text-body.preferred-height + 18px;
+    border-radius: Theme.r-sm;
+    background: Theme.surface-2;
+    clip: true;
+
+    Rectangle {
+        x: 0;
+        y: 0;
+        width: 2px;
+        height: parent.height;
+        background: kind == "warn" ? Theme.warning
+            : kind == "error" ? Theme.error
+            : kind == "ok" ? Theme.success
+            : Theme.accent-line;
+    }
+
+    text-body := Text {
+        x: Theme.s-3;
+        y: 9px;
+        width: parent.width - Theme.s-4 - 2px;
+        text: root.body;
+        color: Theme.text-2;
+        font-family: Theme.font;
+        font-size: Theme.t-body;
+        wrap: word-wrap;
+    }
+}
+
+export component EndpointField inherits Rectangle {
+    in property <string> label: "";
+    in property <string> value: "";
+    in property <string> placeholder: "Not available";
+    in property <bool> mono: true;
+    in property <string> tone: "normal";
+    height: 36px;
+    background: transparent;
+
+    HorizontalLayout {
+        spacing: Theme.s-3;
+
+        Text {
+            width: 112px;
+            text: root.label;
+            color: Theme.text-3;
+            font-family: Theme.font;
+            font-size: Theme.t-body;
+            vertical-alignment: center;
+        }
+
+        Rectangle {
+            horizontal-stretch: 1;
+            min-height: 30px;
+            border-radius: Theme.r-sm;
+            background: Theme.bg;
+            border-width: 1px;
+            border-color: Theme.divider;
+            clip: true;
+
+            Text {
+                x: 10px;
+                width: parent.width - 20px;
+                height: parent.height;
+                text: root.value == "" ? root.placeholder : root.value;
+                color: root.value == "" ? Theme.text-4 : (root.tone == "error" ? Theme.error : Theme.text);
+                font-family: root.mono ? Theme.mono : Theme.font;
+                font-size: root.mono ? Theme.t-caption : Theme.t-body;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+        }
+
+        @children
+    }
+}
+
+export component DiagItem inherits Rectangle {
+    in property <string> label: "";
+    in property <string> detail: "";
+    in property <string> value: "";
+    in property <string> state: "idle";
+    height: 42px;
+    background: transparent;
+
+    HorizontalLayout {
+        spacing: Theme.s-3;
+
+        StatusDot { kind: root.state; }
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 1px;
+            Text {
+                text: root.label;
+                color: Theme.text;
+                font-family: Theme.font;
+                font-size: Theme.t-body-lg;
+                overflow: elide;
+            }
+            Text {
+                text: root.detail;
+                color: Theme.text-3;
+                font-family: Theme.font;
+                font-size: Theme.t-caption;
+                overflow: elide;
+            }
+        }
+
+        Text {
+            text: root.value;
+            color: root.state == "error" ? Theme.error : (root.state == "warn" ? Theme.warning : Theme.text-2);
+            font-family: Theme.font;
+            font-size: Theme.t-body;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+            min-width: 96px;
+        }
+    }
+
+    Rectangle {
+        y: parent.height - 1px;
+        width: parent.width;
+        height: 1px;
+        background: Theme.divider;
+    }
+}
+
+export component ProviderOption inherits FocusScope {
+    in property <string> headline: "";
+    in property <string> summary: "";
+    in property <bool> selected: false;
+    callback clicked;
+
+    height: 64px;
+    horizontal-stretch: 1;
+
+    ta := TouchArea {
+        width: 100%;
+        height: 100%;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+
+    bg := Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: Theme.r-md;
+        background: root.selected ? Theme.accent-soft : Theme.bg;
+        border-width: 1px;
+        border-color: root.selected ? Theme.accent-line : Theme.border;
+
+        states [
+            hovered when ta.has-hover && !root.selected: {
+                background: Theme.hover;
+                border-color: Theme.border-strong;
+            }
+        ]
+    }
+
+    ring := Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: Theme.r-md;
+        border-width: 1px;
+        border-color: root.has-focus ? Theme.accent-line : transparent;
+    }
+
+    VerticalLayout {
+        x: 14px;
+        y: 0;
+        width: parent.width - 28px;
+        height: parent.height;
+        spacing: 2px;
+        alignment: center;
+
+        Text {
+            text: root.headline;
+            color: Theme.text;
+            font-family: Theme.font;
+            font-size: Theme.t-body-lg;
+            font-weight: 600;
+            horizontal-alignment: center;
+        }
+        Text {
+            text: root.summary;
+            color: Theme.text-3;
+            font-family: Theme.font;
+            font-size: Theme.t-caption;
+            wrap: word-wrap;
+            horizontal-alignment: center;
+        }
+    }
+
+    // The selected provider used to spell out "[active]"; a green dot says it
+    // without the label taking room away from the centered text.
+    Rectangle {
+        visible: root.selected;
+        x: parent.width - 16px;
+        y: 12px;
+        width: 7px;
+        height: 7px;
+        border-radius: 4px;
+        background: Theme.success;
+    }
+
+    key-pressed(event) => {
+        if (event.text == " " || event.text == "\n") {
+            clicked();
+            return accept;
+        }
+        return reject;
+    }
+}
+
+// ----------------------------------------------------------------- log viewer
+
+export component LogLine inherits Rectangle {
+    in property <LogRow> entry;
+    height: 22px;
+    background: transparent;
+
+    HorizontalLayout {
+        spacing: Theme.s-3;
+        padding-left: Theme.s-3;
+        padding-right: Theme.s-3;
+
+        Text {
+            width: 62px;
+            text: entry.time;
+            color: Theme.text-4;
+            font-family: Theme.mono;
+            font-size: Theme.t-caption;
+            vertical-alignment: center;
+        }
+
+        Text {
+            width: 42px;
+            text: entry.level;
+            color: entry.level == "error" ? Theme.error
+                : entry.level == "warn" ? Theme.warning
+                : entry.level == "debug" ? Theme.text-4
+                : Theme.text-3;
+            font-family: Theme.mono;
+            font-size: Theme.t-caption;
+            vertical-alignment: center;
+        }
+
+        Text {
+            horizontal-stretch: 1;
+            text: entry.text;
+            color: entry.level == "error" ? #e9a2a2 : Theme.text-2;
+            font-family: Theme.mono;
+            font-size: Theme.t-caption;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+    }
+}
+
+export component LogList inherits Flickable {
+    in property <[LogRow]> entries;
+    in-out property <bool> follow: true;
+    in property <int> tick: 0;
+
+    interactive: true;
+    content-height: body.preferred-height;
+    content-width: self.width;
+
+    changed tick => {
+        if (follow) {
+            self.content-y = -max(0px, self.content-height - self.height);
+        }
+    }
+
+    flicked => {
+        if (follow) {
+            follow = false;
+        }
+    }
+
+    body := VerticalLayout {
+        width: parent.width;
+        for row in entries : LogLine { entry: row; }
+    }
+
+    thumb := Rectangle {
+        width: 3px;
+        x: root.width - 5px;
+        visible: root.content-height > root.height + 1px;
+        height: max(24px, root.height * (root.height / max(1px, root.content-height)));
+        y: max(0px, min(root.height - self.height,
+            (-root.content-y) / max(1px, root.content-height - root.height) * (root.height - self.height)));
+        border-radius: 2px;
+        background: #565a70;
+    }
+}
+
+// --------------------------------------------------------------------- overlay
+
+export component Toast inherits Rectangle {
+    in property <string> message: "";
+    in property <string> kind: "info";
+    in property <bool> shown: false;
+    // An empty message used to leave a blank box floating in the corner.
+    visible: shown && root.message != "";
+
+    width: 340px;
+    height: text-message.preferred-height + 20px;
+    border-radius: Theme.r-md;
+    background: Theme.raised;
+    border-width: 1px;
+    border-color: Theme.border-strong;
+    drop-shadow-blur: 12px;
+    drop-shadow-color: #00000066;
+    drop-shadow-offset-y: 4px;
+
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 10px;
+
+        StatusDot {
+            kind: kind == "error" ? "error" : (kind == "ok" ? "ok" : "accent");
+        }
+        text-message := Text {
+            horizontal-stretch: 1;
+            text: root.message;
+            color: Theme.text;
+            font-family: Theme.font;
+            font-size: Theme.t-body;
+            vertical-alignment: center;
+            wrap: word-wrap;
+            max-lines: 3;
+        }
+    }
+}
+
+export component ConfirmDialog inherits Rectangle {
+    in property <string> headline: "";
+    in property <string> body: "";
+    in property <string> confirm-text: "Confirm";
+    in property <string> cancel-text: "Cancel";
+    in property <string> secondary-text: "";
+    in property <bool> danger: false;
+    in property <bool> shown: false;
+    callback confirmed;
+    callback cancelled;
+    callback secondary;
+
+    visible: shown;
+    background: #000000CC;
+
+    panel := Rectangle {
+        width: 420px;
+        min-height: 160px;
+        height: content.preferred-height + 40px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        background: Theme.surface;
+        border-radius: Theme.r-lg;
+        border-width: 1px;
+        border-color: Theme.border-strong;
+
+        content := VerticalLayout {
+            x: 20px;
+            y: 20px;
+            width: parent.width - 40px;
+            spacing: 8px;
+
+            Text {
+                text: root.headline;
+                color: Theme.text;
+                font-family: Theme.font;
+                font-size: 14px;
+                font-weight: 600;
+                wrap: word-wrap;
+            }
+
+            Text {
+                text: root.body;
+                color: Theme.text-2;
+                font-family: Theme.font;
+                font-size: Theme.t-body;
+                wrap: word-wrap;
+            }
+
+            Rectangle { height: 5px; background: transparent; }
+
+            HorizontalLayout {
+                spacing: Theme.s-2;
+                alignment: end;
+                if root.secondary-text != "" : SecondaryButton {
+                    caption: root.secondary-text;
+                    compact: true;
+                    clicked => { root.secondary(); }
+                }
+                SecondaryButton {
+                    caption: root.cancel-text;
+                    compact: true;
+                    clicked => { root.cancelled(); }
+                }
+                if root.danger : DangerButton {
+                    caption: root.confirm-text;
+                    compact: true;
+                    clicked => { root.confirmed(); }
+                }
+                if !root.danger : PrimaryButton {
+                    caption: root.confirm-text;
+                    compact: true;
+                    clicked => { root.confirmed(); }
+                }
+            }
+        }
+    }
+}
+
+// ------------------------------------------------------------------ update notification
+export component UpdateNotification inherits Rectangle {
+
+    in property <string> latest_version: "0.0.0";
+    in property <string> changelog: "";
+    callback on_update_clicked;
+
+    background: transparent;
+
+    VerticalLayout {
+        spacing: Theme.s-2;
+
+        Text {
+            text: "Update available: " + latest_version;
+            color: Theme.accent;
+            font-family: Theme.font;
+            font-size: Theme.t-body;
+            horizontal-alignment: center;
+        }
+
+        Text {
+            text: root.changelog;
+            color: Theme.text-2;
+            font-family: Theme.font;
+            font-size: Theme.t-caption;
+            wrap: word-wrap;
+            horizontal-stretch: 1;
+            horizontal-alignment: center;
+        }
+
+        HorizontalLayout {
+            spacing: Theme.s-2;
+            alignment: end;
+
+            PrimaryButton {
+                caption: "Update now";
+                clicked => { root.on_update_clicked(); }
+            }
+        }
+    }
+}

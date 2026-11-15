@@ -1,0 +1,267 @@
+import { Theme } from "../theme.slint";
+import {
+    Panel, PageHeader, Metric, PrimaryButton, SecondaryButton, DangerButton, LinkButton,
+    EndpointField, Note, LogLine, ServiceInfo, EndpointInfo, LogRow,
+} from "../components.slint";
+
+export component OverviewPage inherits Rectangle {
+    in property <ServiceInfo> service;
+    in property <EndpointInfo> endpoint;
+    in property <[LogRow]> recent;
+    in property <bool> busy: false;
+
+    callback start-relay();
+    callback stop-relay();
+    callback restart-relay();
+    callback copy-manifest();
+    callback open-endpoint();
+    callback install-stremio();
+    callback open-logs();
+
+    background: transparent;
+
+    VerticalLayout {
+        spacing: Theme.s-4;
+
+        // ------------------------------------------------------------ header
+        Rectangle {
+            height: 46px;
+            background: transparent;
+
+            HorizontalLayout {
+                spacing: Theme.s-4;
+
+                PageHeader {
+                    horizontal-stretch: 1;
+                    headline: "Overview";
+                    subtitle: service.detail;
+                }
+
+                HorizontalLayout {
+                    spacing: Theme.s-2;
+
+                    // An adopted relay belongs to another process, so the app
+                    // can show it but never restart or stop it.
+                    SecondaryButton {
+                        caption: "Restart";
+                        enabled: service.running && !service.external && !busy;
+                        clicked => { root.restart-relay(); }
+                    }
+
+                    if service.running : DangerButton {
+                        caption: "Stop relay";
+                        enabled: !service.external && !busy;
+                        busy: busy;
+                        clicked => { root.stop-relay(); }
+                    }
+
+                    if !service.running : PrimaryButton {
+                        caption: "Start relay";
+                        enabled: !busy;
+                        busy: busy;
+                        clicked => { root.start-relay(); }
+                    }
+                }
+            }
+        }
+
+        // ------------------------------------------------------ status strip
+        Rectangle {
+            height: 76px;
+            background: Theme.surface;
+            border-radius: Theme.r-lg;
+            border-width: 1px;
+            border-color: Theme.divider;
+
+            HorizontalLayout {
+                padding-left: 18px;
+                padding-right: 18px;
+                padding-top: 14px;
+                padding-bottom: 14px;
+                spacing: 16px;
+
+                Metric {
+                    horizontal-stretch: 1.4;
+                    label: "RELAY";
+                    value: service.status-text;
+                    kind: service.status-kind;
+                }
+
+                Rectangle { width: 1px; background: Theme.divider; }
+
+                Metric {
+                    horizontal-stretch: 1;
+                    label: "UPTIME";
+                    value: service.uptime;
+                    kind: service.running ? "ok" : "idle";
+                }
+
+                Rectangle { width: 1px; background: Theme.divider; }
+
+                Metric {
+                    horizontal-stretch: 1;
+                    label: "NODE.JS";
+                    value: service.node-version;
+                    kind: service.node-ok ? "idle" : "error";
+                }
+
+                Rectangle { width: 1px; background: Theme.divider; }
+
+                Metric {
+                    horizontal-stretch: 1;
+                    label: "BACKEND";
+                    value: service.health-text;
+                    kind: service.health-kind;
+                }
+
+                Rectangle { width: 1px; background: Theme.divider; }
+
+                Metric {
+                    horizontal-stretch: 1;
+                    label: "MIRRORS";
+                    value: service.mirrors-online + " of " + service.mirrors-total;
+                    kind: service.mirrors-total == 0 ? "idle"
+                        : service.mirrors-online == 0 ? "error"
+                        : service.mirrors-online < service.mirrors-total ? "warn"
+                        : "ok";
+                }
+
+                Rectangle { width: 1px; background: Theme.divider; }
+
+                Metric {
+                    horizontal-stretch: 1;
+                    label: "STREAMS";
+                    value: service.sessions + " / " + service.sessions-max;
+                    kind: "idle";
+                }
+            }
+        }
+
+        // -------------------------------------------------- public endpoint
+        Panel {
+            headline: "Public endpoint";
+            hint: endpoint.provider;
+            vertical-stretch: 0;
+
+            EndpointField {
+                label: "Public host";
+                value: endpoint.host;
+                tone: endpoint.kind == "error" ? "error" : "normal";
+            }
+
+            EndpointField {
+                label: "Manifest URL";
+                value: endpoint.manifest;
+                placeholder: "Available once the relay is online";
+                tone: endpoint.kind == "error" ? "error" : "normal";
+
+                SecondaryButton {
+                    caption: "Copy";
+                    compact: true;
+                    enabled: endpoint.has-url;
+                    clicked => { root.copy-manifest(); }
+                }
+                SecondaryButton {
+                    caption: "Open";
+                    compact: true;
+                    enabled: endpoint.has-url;
+                    clicked => { root.open-endpoint(); }
+                }
+            }
+
+            EndpointField {
+                label: "Local relay";
+                value: endpoint.local;
+            }
+
+            if endpoint.note != "" : Note {
+                body: endpoint.note;
+                kind: "warn";
+            }
+
+            Rectangle { height: 6px; background: transparent; }
+
+            Rectangle {
+                height: 32px;
+                background: transparent;
+
+                HorizontalLayout {
+                    spacing: Theme.s-2;
+                    alignment: end;
+
+                    LinkButton {
+                        text: "Landing page";
+                        width: 92px;
+                        active: endpoint.has-url;
+                        vertical-alignment: center;
+                        clicked => { root.open-endpoint(); }
+                    }
+
+                    SecondaryButton {
+                        caption: "Copy manifest URL";
+                        enabled: endpoint.has-url;
+                        clicked => { root.copy-manifest(); }
+                    }
+
+                    PrimaryButton {
+                        caption: service.running ? "Install in Stremio" : "Relay is offline";
+                        enabled: endpoint.has-url && service.running;
+                        clicked => { root.install-stremio(); }
+                    }
+                }
+            }
+        }
+
+        // ------------------------------------------------- recent activity
+        Panel {
+            headline: "Recent activity";
+            hint: "Last 6 entries";
+            vertical-stretch: 1;
+
+            if recent.length == 0 : Rectangle {
+                vertical-stretch: 1;
+                background: Theme.bg;
+                border-radius: Theme.r-sm;
+                border-width: 1px;
+                border-color: Theme.divider;
+
+                Text {
+                    x: Theme.s-3;
+                    y: 12px;
+                    text: "Nothing logged yet. Start the relay to see its output here.";
+                    color: Theme.text-3;
+                    font-family: Theme.font;
+                    font-size: Theme.t-body;
+                }
+            }
+
+            if recent.length > 0 : Rectangle {
+                vertical-stretch: 1;
+                background: Theme.bg;
+                border-radius: Theme.r-sm;
+                border-width: 1px;
+                border-color: Theme.divider;
+                clip: true;
+
+                VerticalLayout {
+                    padding-top: 4px;
+                    padding-bottom: 4px;
+                    for row in recent : LogLine { entry: row; }
+                }
+            }
+
+            Rectangle {
+                height: 24px;
+                background: transparent;
+                HorizontalLayout {
+                    alignment: end;
+                    LinkButton {
+                        text: "Open logs";
+                        width: 68px;
+                        clicked => { root.open-logs(); }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -75,8 +75,9 @@ Prefer a window over a terminal? Download one of these from the
 
 | Build | What it does |
 | --- | --- |
-| `DhakaFlixRelay-Setup-1.2.0.exe` | Per-user installer with Start Menu/desktop shortcuts and an uninstaller |
-| `DhakaFlixRelay-Portable-1.2.0.zip` | Unzip anywhere and run `DhakaFlixRelay.exe`; no install |
+| `DhakaFlixRelay-Setup-1.3.0.exe` | Per-user installer with Start Menu/desktop shortcuts and an uninstaller |
+| `DhakaFlixRelay-Portable-1.3.0.exe` | Single file: unpacks the full folder into a directory you pick, then launches it |
+| `DhakaFlixRelay-Portable-1.3.0.zip` | Unzip anywhere and run `DhakaFlixRelay.exe`; no install |
 
 Both need no administrator rights. The dashboard gives you Start/Stop, live
 status, the Stremio install link, realtime logs and a launch-at-Windows-startup
@@ -112,9 +113,17 @@ keeps the same URL.
 
 ![DhakaFlix Relay desktop dashboard](docs/desktop-app.png)
 
-Build it with `.\desktop\build.ps1` (needs the .NET SDK, .NET Framework 4.8
-reference assemblies and Inno Setup 6); it also produces the portable zip.
-Details, file locations and troubleshooting: [desktop/README.md](desktop/README.md).
+The window is a native Rust + Slint application: Overview, Public access,
+Diagnostics, Logs and Settings as separate pages, a log view that filters by
+level and text, and credentials masked before they reach the window.
+
+Build it with `.\desktop-rust\build.ps1` (Rust stable and Inno Setup 6 or 7). All
+three builds carry Node.js, the relay's npm packages and cloudflared inside
+them, so a freshly unpacked copy needs no downloads; the first start only writes
+`.env` with a new `PROXY_SECRET`. Details and limitations:
+[desktop-rust/README.md](desktop-rust/README.md).
+
+![DhakaFlix Relay Rust dashboard](desktop-rust/docs/overview.png)
 
 ## Quick start (local / any OS)
 
@@ -216,9 +225,44 @@ The Windows desktop app can publish the relay through Tailscale Funnel:
   sustained video bandwidth.
 
 Open **Public access → Tailscale Funnel** in the dashboard, click **Connect** if
-needed, then **Enable Funnel**. See
-[desktop/README.md](desktop/README.md#tailscale-funnel) for the GUI flow and
-troubleshooting.
+needed, then **Enable Funnel**. The step-by-step walkthrough is below.
+
+### Tailscale setup, step by step
+
+Everything here is done once, on the machine that runs the relay.
+
+1. Install Tailscale from <https://tailscale.com/download/windows> and open it.
+2. Sign in with the account that owns the tailnet and leave it connected. The
+   tray icon must say Connected, not Sign in.
+3. In the admin console open **DNS** and turn on **MagicDNS**, then under
+   **HTTPS Certificates** click **Enable HTTPS**.
+4. Open **Access controls** and allow Funnel for your devices. The policy needs a
+   `nodeAttrs` entry like this one:
+
+   ```json
+   "nodeAttrs": [
+       { "target": ["autogroup:member"], "attr": ["funnel"] }
+   ]
+   ```
+
+5. The address is `https://<device-name>.<tailnet>.ts.net`. Rename the device in
+   **Machines** if you want a friendlier first label; turn Funnel off while
+   renaming, because the hostname changes with it.
+6. In the dashboard open **Public access**, choose **Tailscale Funnel**, click
+   **Connect** if the app asks for it, then click **Enable Funnel**.
+7. The app creates its own port 443 Funnel listener for the relay only, then
+   checks `https://<device>.<tailnet>.ts.net/health` and `/manifest.json` and
+   reports Funnel is live only when both answer.
+8. Install the addon in Stremio once with that manifest URL. It survives restarts
+   and reboots, so this is the mode to use for a permanent setup.
+
+**Disable Funnel** removes the public listener and leaves your tailnet connected.
+
+If Funnel does not come up, check in this order: Tailscale is signed in, MagicDNS
+and HTTPS certificates are enabled, the tailnet policy allows `funnel`, and no
+other process on the tailnet already owns port 443. Tailscale also throttles
+sustained video bandwidth, so long streams can be slower than on a Cloudflare
+tunnel.
 
 ---
 

@@ -1,0 +1,311 @@
+import { Theme } from "../theme.slint";
+import {
+    Panel, PageHeader, ToggleSwitch, SegmentedOption, SecondaryButton, PrimaryButton,
+    EndpointField, TextField, Note, PrefsInfo,
+} from "../components.slint";
+
+export component SettingsPage inherits Rectangle {
+    in property <PrefsInfo> prefs;
+    in property <string> provider: "cloudflare";
+    in property <string> log-level: "info";
+    in property <bool> busy: false;
+    in-out property <string> port-text: "";
+    in-out property <string> max-streams-text: "";
+
+    callback set-startup(bool);
+    callback set-auto-start(bool);
+    callback set-tray(bool);
+    callback select-provider(string);
+    callback set-log-level(string);
+    callback save();
+    callback open-config();
+    callback open-logs();
+    callback repair();
+    callback reset-prefs();
+    callback check-updates();
+
+    background: transparent;
+
+    VerticalLayout {
+        spacing: Theme.s-4;
+
+        Rectangle {
+            height: 46px;
+            background: transparent;
+
+            HorizontalLayout {
+                spacing: Theme.s-4;
+
+                PageHeader {
+                    horizontal-stretch: 1;
+                    headline: "Settings";
+                    subtitle: "Preferences live in " + prefs.config-dir;
+                }
+
+                PrimaryButton {
+                    caption: "Save changes";
+                    enabled: !busy;
+                    clicked => { root.save(); }
+                }
+            }
+        }
+
+        // ------------------------------------------------- behaviour
+        Panel {
+            headline: "Startup and window";
+            vertical-stretch: 0;
+
+            ToggleSwitch {
+                caption: "Launch at Windows startup";
+                checked: prefs.startup;
+                toggled(value) => { root.set-startup(value); }
+            }
+
+            ToggleSwitch {
+                caption: "Start relay when the app launches";
+                checked: prefs.auto-start;
+                toggled(value) => { root.set-auto-start(value); }
+            }
+
+            ToggleSwitch {
+                caption: "Minimise to the notification area";
+                checked: prefs.minimize-to-tray;
+                toggled(value) => { root.set-tray(value); }
+            }
+        }
+
+        // ------------------------------------------------- relay
+        Panel {
+            headline: "Relay";
+            vertical-stretch: 0;
+
+            Rectangle {
+                height: 34px;
+                background: transparent;
+
+                HorizontalLayout {
+                    spacing: Theme.s-3;
+
+                    Text {
+                        width: 148px;
+                        text: "Relay port";
+                        color: Theme.text-2;
+                        font-family: Theme.font;
+                        font-size: Theme.t-body;
+                        vertical-alignment: center;
+                    }
+
+                    TextField {
+                        field-width: 96px;
+                        mono: true;
+                        value <=> root.port-text;
+                        placeholder: "7001";
+                    }
+
+                    Text {
+                        horizontal-stretch: 1;
+                        text: "Applies the next time the relay starts. Range 1024–65535.";
+                        color: Theme.text-3;
+                        font-family: Theme.font;
+                        font-size: Theme.t-caption;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 34px;
+                background: transparent;
+
+                HorizontalLayout {
+                    spacing: Theme.s-3;
+
+                    Text {
+                        width: 148px;
+                        text: "Maximum streams";
+                        color: Theme.text-2;
+                        font-family: Theme.font;
+                        font-size: Theme.t-body;
+                        vertical-alignment: center;
+                    }
+
+                    TextField {
+                        field-width: 96px;
+                        mono: true;
+                        value <=> root.max-streams-text;
+                        placeholder: "8";
+                    }
+
+                    Text {
+                        horizontal-stretch: 1;
+                        text: "Written to MAX_PROXY_STREAMS in .env. Keep it low on a home upload link.";
+                        color: Theme.text-3;
+                        font-family: Theme.font;
+                        font-size: Theme.t-caption;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 34px;
+                background: transparent;
+
+                HorizontalLayout {
+                    spacing: Theme.s-3;
+
+                    Text {
+                        width: 148px;
+                        text: "Log level";
+                        color: Theme.text-2;
+                        font-family: Theme.font;
+                        font-size: Theme.t-body;
+                        vertical-alignment: center;
+                    }
+
+                    HorizontalLayout {
+                        spacing: 4px;
+                        SegmentedOption { caption: "Info"; selected: root.log-level == "info"; clicked => { root.set-log-level("info"); } }
+                        SegmentedOption { caption: "Warn"; selected: root.log-level == "warn"; clicked => { root.set-log-level("warn"); } }
+                        SegmentedOption { caption: "Error"; selected: root.log-level == "error"; clicked => { root.set-log-level("error"); } }
+                        SegmentedOption { caption: "Debug"; selected: root.log-level == "debug"; clicked => { root.set-log-level("debug"); } }
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 34px;
+                background: transparent;
+
+                HorizontalLayout {
+                    spacing: Theme.s-3;
+
+                    Text {
+                        width: 148px;
+                        text: "Default provider";
+                        color: Theme.text-2;
+                        font-family: Theme.font;
+                        font-size: Theme.t-body;
+                        vertical-alignment: center;
+                    }
+
+                    HorizontalLayout {
+                        spacing: 4px;
+                        SegmentedOption { caption: "Cloudflare"; selected: root.provider == "cloudflare"; clicked => { root.select-provider("cloudflare"); } }
+                        SegmentedOption { caption: "Tailscale"; selected: root.provider == "tailscale"; clicked => { root.select-provider("tailscale"); } }
+                    }
+                }
+            }
+
+            Note {
+                kind: "info";
+                body: "Settings are written line by line into .env. PROXY_SECRET and unrelated keys are never touched, and the previous file is kept as a .env.bak-<timestamp> backup.";
+            }
+        }
+
+        // ------------------------------------------------- maintenance
+        Panel {
+            headline: "Maintenance";
+            hint: "v" + prefs.version;
+            vertical-stretch: 1;
+
+            EndpointField {
+                label: "Configuration";
+                value: prefs.config-dir;
+
+                SecondaryButton {
+                    caption: "Open";
+                    compact: true;
+                    clicked => { root.open-config(); }
+                }
+            }
+
+            EndpointField {
+                label: "Logs";
+                value: prefs.logs-dir;
+
+                SecondaryButton {
+                    caption: "Open";
+                    compact: true;
+                    clicked => { root.open-logs(); }
+                }
+            }
+
+            Rectangle {
+                height: 34px;
+                background: transparent;
+
+                HorizontalLayout {
+                    spacing: Theme.s-3;
+
+                    Text {
+                        width: 148px;
+                        text: "Version";
+                        color: Theme.text-2;
+                        font-family: Theme.font;
+                        font-size: Theme.t-body;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        horizontal-stretch: 1;
+                        text: "v" + prefs.version + "  ·  installs the newest GitHub release";
+                        color: Theme.text-3;
+                        font-family: Theme.font;
+                        font-size: Theme.t-caption;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+
+                    SecondaryButton {
+                        caption: "Check for updates";
+                        enabled: !busy;
+                        clicked => { root.check-updates(); }
+                    }
+                }
+            }
+
+            Rectangle { vertical-stretch: 1; background: transparent; }
+
+            Rectangle {
+                height: 32px;
+                background: transparent;
+
+                HorizontalLayout {
+                    spacing: Theme.s-2;
+
+                    SecondaryButton {
+                        caption: "Repair dependencies";
+                        enabled: !busy;
+                        clicked => { root.repair(); }
+                    }
+                    SecondaryButton {
+                        caption: "Reset preferences";
+                        clicked => { root.reset-prefs(); }
+                    }
+                    Rectangle { horizontal-stretch: 1; }
+                    Text {
+                        text: "A reset keeps .env and PROXY_SECRET.";
+                        color: Theme.text-3;
+                        font-family: Theme.font;
+                        font-size: Theme.t-caption;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            Rectangle { height: 2px; background: transparent; }
+
+            Text {
+                text: "DhakaFlix Relay " + prefs.version
+                    + "  ·  interface built with Slint under its royalty-free licence";
+                color: Theme.text-3;
+                font-family: Theme.font;
+                font-size: Theme.t-caption;
+                wrap: word-wrap;
+            }
+        }
+    }
+}

@@ -1,0 +1,46 @@
+// Native notification-area icon. Slint maps this to Shell_NotifyIconW on
+// Windows, so no extra crate or message-pump thread is needed.
+
+export component TrayMenu inherits SystemTrayIcon {
+    in property <bool> relay-running: false;
+    in property <bool> has-link: false;
+
+    icon: @image-url("../assets/tray.png");
+    tooltip: relay-running ? "DhakaFlix Relay — relay running" : "DhakaFlix Relay — relay stopped";
+
+    callback show-window();
+    callback start-relay();
+    callback stop-relay();
+    callback copy-link();
+    callback quit();
+
+    clicked => { show-window(); }
+
+    Menu {
+        MenuItem {
+            title: "Open dashboard";
+            activated => { show-window(); }
+        }
+        MenuSeparator { }
+        MenuItem {
+            title: "Start relay";
+            enabled: !relay-running;
+            activated => { start-relay(); }
+        }
+        MenuItem {
+            title: "Stop relay";
+            enabled: relay-running;
+            activated => { stop-relay(); }
+        }
+        MenuItem {
+            title: "Copy Stremio link";
+            enabled: has-link;
+            activated => { copy-link(); }
+        }
+        MenuSeparator { }
+        MenuItem {
+            title: "Quit DhakaFlix Relay";
+            activated => { quit(); }
+        }
+    }
+}

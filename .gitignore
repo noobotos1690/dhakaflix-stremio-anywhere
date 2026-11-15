@@ -21,3 +21,19 @@ desktop/install-final/
 desktop/quittest/
 desktop/stremiotest/
 desktop/tests/bin/
+
+# Rust desktop app build output
+desktop-rust/target/
+desktop-rust/dist/
+
+# Retired WinForms app: kept in history, no longer shipped from this repo
+/desktop/
+
+# Local state written by the app
+.env.bak-*
+logs/
+.freebuff/
+
+# stray build archives
+*.zip.bak
+desktop-rust/zia*
