@@ -1,8 +1,9 @@
 # DhakaFlix Relay - Rust desktop app
 
-The Windows dashboard for the DhakaFlix Stremio relay, rewritten as a native
-Rust application with a Slint interface. The Node.js relay, BDIX providers, the
-Stremio addon API and the streaming proxy are unchanged; this app starts and
+The desktop app for the DhakaFlix Stremio relay: a native Rust application with a
+Slint interface. It is the only desktop build in the repository, and the same
+source is what the Linux port starts from. The Node.js relay, BDIX providers,
+the Stremio addon API and the streaming proxy are unchanged; this app starts and
 supervises that same backend.
 
 ![Dashboard](docs/overview.png)
@@ -26,8 +27,10 @@ tray stops the relay.
 
 ## Requirements
 
-- 64-bit Windows 10 or 11.
-- No .NET, no WebView2, no Electron, no administrator rights.
+- 64-bit Windows 10 or 11 today. The Linux port is next; the Windows-only parts
+  are three small modules (WinHTTP, the registry startup entry, the tray and
+  window helpers), which is where that work goes.
+- No WebView2, no Electron, no administrator rights.
 - Node.js 18+ if it is already installed; otherwise the app downloads a private
   runtime into its own folder on first run. Packaged builds already contain one,
   so nothing is downloaded.

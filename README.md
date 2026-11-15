@@ -68,7 +68,10 @@ Relay is running (pid 4820)
 Paste that URL into Stremio → Addons → Community on **any** device. The URL is
 copied to your clipboard for you.
 
-## Desktop app (Windows, one-click)
+## Desktop app (one-click)
+
+This Rust + Slint app is the only desktop build. The files below are the Windows
+build; the same source is what the Linux port starts from.
 
 Prefer a window over a terminal? Download one of these from the
 [Releases page](https://github.com/noobotos1690/dhakaflix-stremio-anywhere/releases/latest):
@@ -79,12 +82,11 @@ Prefer a window over a terminal? Download one of these from the
 | `DhakaFlixRelay-Portable-1.3.0.exe` | Single file: unpacks the full folder into a directory you pick, then launches it |
 | `DhakaFlixRelay-Portable-1.3.0.zip` | Unzip anywhere and run `DhakaFlixRelay.exe`; no install |
 
-Both need no administrator rights. The dashboard gives you Start/Stop, live
-status, the Stremio install link, realtime logs and a launch-at-Windows-startup
-toggle. On first launch it installs Node.js, the npm packages and `.env`
-locally with a progress bar (admin only if the automatic Node.js download is
-blocked, where it offers a winget install). The first successful start opens
-Stremio so the addon can be added immediately.
+All three need no administrator rights. The dashboard gives you start, stop and
+restart, live status from `/health`, the Stremio link with copy and install,
+realtime logs and a launch-at-Windows-startup toggle. Node.js, the npm packages
+and `.env` are set up on first run with a progress bar, and packaged builds
+carry all of it already.
 
 ### Public access: temporary or stable
 
