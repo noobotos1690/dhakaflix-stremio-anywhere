@@ -25,6 +25,10 @@ supervises that same backend.
 Closing the window hides it to the notification area. Only **Exit** from the
 tray stops the relay.
 
+With **Launch at Windows startup** enabled and Tailscale Funnel configured, a
+login start goes straight to the notification area and no window opens. Opening
+the app by hand, or from the tray icon, brings the dashboard up.
+
 ## Requirements
 
 - 64-bit Windows 10 or 11 today. The Linux port is next; the Windows-only parts
@@ -41,9 +45,9 @@ Three builds, all per-user:
 
 | Build | Use it when |
 | --- | --- |
-| `DhakaFlixRelay-Setup-1.3.0.exe` | You want Start Menu/desktop shortcuts and an uninstaller |
-| `DhakaFlixRelay-Portable-1.3.0.exe` | You want one file that unpacks itself into a folder you pick |
-| `DhakaFlixRelay-Portable-1.3.0.zip` | You want an unpacked folder to copy to a USB drive |
+| `DhakaFlixRelay-Setup-1.3.1.exe` | You want Start Menu/desktop shortcuts and an uninstaller |
+| `DhakaFlixRelay-Portable-1.3.1.exe` | You want one file that unpacks itself into a folder you pick |
+| `DhakaFlixRelay-Portable-1.3.1.zip` | You want an unpacked folder to copy to a USB drive |
 
 The binaries are unsigned, so SmartScreen may show *Windows protected your PC*:
 choose **More info → Run anyway**.
@@ -86,9 +90,10 @@ Artifacts land in `desktop-rust\dist`:
 
 ```
 dist\app\DhakaFlixRelay.exe                     staged payload
-dist\DhakaFlixRelay-Setup-1.3.0.exe             per-user installer
-dist\DhakaFlixRelay-Portable-1.3.0.exe          single-file portable extractor
-dist\DhakaFlixRelay-Portable-1.3.0.zip          portable folder
+dist\DhakaFlixRelay-Setup-1.3.1.exe             per-user installer
+dist\DhakaFlixRelay-Portable-1.3.1.exe          single-file portable extractor
+dist\DhakaFlixRelay-Portable-1.3.1.zip          portable folder
+dist\SHA256SUMS.txt                             checksums for the three builds
 ```
 
 `build.ps1` stages the relay source and bundles the runtime next to the exe:
@@ -196,14 +201,14 @@ mutex, so they replace each other rather than stacking up.
 ## Tests
 
 ```powershell
-cargo test     # 17 unit tests: .env creation and editing, URL splitting, health
-               # payloads, Tailscale status/funnel fixtures, relay output parsing,
-               # redaction, crash logging
+cargo test     # 23 unit tests: .env creation and editing, URL splitting, health
+               # payloads, Tailscale status/funnel fixtures, tray-first startup,
+               # relay output parsing, redaction, crash logging
 npm run smoke  # from the repo root; exercises the Node relay
 ```
 
-The Tailscale tests parse the real CLI JSON samples in
-`desktop\tests\fixtures`, so no Tailscale account is needed.
+The Tailscale tests parse sanitized CLI JSON samples in
+`tests\fixtures`, so no Tailscale account is needed.
 
 ## If it closes unexpectedly
 

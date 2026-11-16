@@ -599,7 +599,7 @@ mod tests {
 
     #[test]
     fn parses_connected_status() {
-        let status = parse_status(include_str!("../../desktop/tests/fixtures/status-running.json"))
+        let status = parse_status(include_str!("../tests/fixtures/status-running.json"))
             .expect("fixture parses");
         assert!(status.connected);
         assert!(!status.needs_login);
@@ -612,7 +612,7 @@ mod tests {
     #[test]
     fn detects_sign_in_requirement() {
         let status =
-            parse_status(include_str!("../../desktop/tests/fixtures/status-needs-login.json"))
+            parse_status(include_str!("../tests/fixtures/status-needs-login.json"))
                 .expect("fixture parses");
         assert!(status.needs_login);
         assert!(!status.connected);
@@ -626,7 +626,7 @@ mod tests {
     #[test]
     fn parses_active_funnel() {
         let funnel =
-            parse_funnel(include_str!("../../desktop/tests/fixtures/funnel-active.json")).unwrap();
+            parse_funnel(include_str!("../tests/fixtures/funnel-active.json")).unwrap();
         assert!(funnel.configured);
         assert!(funnel.enabled);
         assert!(funnel.matches(7001));
@@ -640,7 +640,7 @@ mod tests {
     #[test]
     fn notices_conflicting_listener() {
         let funnel =
-            parse_funnel(include_str!("../../desktop/tests/fixtures/funnel-conflict.json")).unwrap();
+            parse_funnel(include_str!("../tests/fixtures/funnel-conflict.json")).unwrap();
         assert!(funnel.configured);
         assert!(!funnel.matches(7001));
         assert_eq!(funnel.target.as_deref(), Some("http://127.0.0.1:8080"));
@@ -649,7 +649,7 @@ mod tests {
     #[test]
     fn treats_empty_config_as_off() {
         let funnel =
-            parse_funnel(include_str!("../../desktop/tests/fixtures/funnel-off.json")).unwrap();
+            parse_funnel(include_str!("../tests/fixtures/funnel-off.json")).unwrap();
         assert!(!funnel.configured);
         assert!(funnel.target.is_none());
     }

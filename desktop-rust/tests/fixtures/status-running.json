@@ -1,0 +1,17 @@
+{
+  "Version": "1.102.4-test",
+  "BackendState": "Running",
+  "AuthURL": "",
+  "Self": {
+    "DNSName": "demo-host.tailnet-test.ts.net.",
+    "HostName": "demo-host",
+    "Online": true
+  },
+  "CurrentTailnet": {
+    "Name": "tailnet-test.ts.net",
+    "MagicDNSEnabled": true
+  },
+  "MagicDNSSuffix": "tailnet-test.ts.net",
+  "CertDomains": ["demo-host.tailnet-test.ts.net"],
+  "Health": []
+}

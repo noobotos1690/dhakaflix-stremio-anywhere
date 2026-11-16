@@ -5,7 +5,7 @@
 ; the tray, then delete the folder.
 
 #define AppName "DhakaFlix Relay"
-#define AppVersion "1.3.0"
+#define AppVersion "1.3.1"
 #define AppExe "DhakaFlixRelay.exe"
 #define AppPublisher "DhakaFlix"
 

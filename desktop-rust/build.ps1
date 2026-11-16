@@ -233,6 +233,20 @@ Write-Ok $zipPath
 
 $portableExePath = Join-Path $distDir ('DhakaFlixRelay-Portable-{0}.exe' -f $version)
 
+Write-Step 'Writing SHA-256 checksums'
+$checksumPath = Join-Path $distDir 'SHA256SUMS.txt'
+$released = @(
+    (Join-Path $distDir ('DhakaFlixRelay-Setup-{0}.exe' -f $version)),
+    $portableExePath,
+    $zipPath
+) | Where-Object { Test-Path $_ }
+$checksumLines = foreach ($file in $released) {
+    $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
+    '{0}  {1}' -f $hash, (Split-Path -Leaf $file)
+}
+[System.IO.File]::WriteAllLines($checksumPath, $checksumLines, (New-Object System.Text.UTF8Encoding($false)))
+Write-Ok $checksumPath
+
 Write-Host "`nBuild complete." -ForegroundColor Green
 Write-Host ("  Payload   : {0:N1} MB in {1} files" -f ($payload.Sum / 1MB), $payload.Count)
 Write-Host "  App       : $exePath"
@@ -240,3 +254,4 @@ $setup = Join-Path $distDir ('DhakaFlixRelay-Setup-{0}.exe' -f $version)
 if (Test-Path $setup) { Write-Host "  Installer : $setup" }
 if (Test-Path $portableExePath) { Write-Host "  Portable  : $portableExePath" }
 Write-Host "  Zip       : $zipPath"
+Write-Host "  Checksums : $checksumPath"

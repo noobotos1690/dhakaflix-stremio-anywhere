@@ -2,7 +2,7 @@
 ; The app never elevates: Node.js is downloaded into its own folder.
 
 #define AppName "DhakaFlix Relay"
-#define AppVersion "1.3.0"
+#define AppVersion "1.3.1"
 #define AppExe "DhakaFlixRelay.exe"
 #define AppPublisher "DhakaFlix"
 

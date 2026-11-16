@@ -1117,9 +1117,12 @@ export component ConfirmDialog inherits Rectangle {
     background: #000000CC;
 
     panel := Rectangle {
-        width: 420px;
-        min-height: 160px;
-        height: content.preferred-height + 40px;
+        // Never wider than the window, so a narrow window wraps the body
+        // instead of pushing the panel past its edges.
+        width: min(448px, parent.width - 48px);
+        // The layout adds its own padding to the preferred height, so the
+        // panel always wraps the buttons instead of clipping them.
+        height: content.preferred-height;
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
         background: Theme.surface;
@@ -1128,16 +1131,14 @@ export component ConfirmDialog inherits Rectangle {
         border-color: Theme.border-strong;
 
         content := VerticalLayout {
-            x: 20px;
-            y: 20px;
-            width: parent.width - 40px;
-            spacing: 8px;
+            padding: 24px;
+            spacing: 10px;
 
             Text {
                 text: root.headline;
                 color: Theme.text;
                 font-family: Theme.font;
-                font-size: 14px;
+                font-size: 15px;
                 font-weight: 600;
                 wrap: word-wrap;
             }
@@ -1150,7 +1151,7 @@ export component ConfirmDialog inherits Rectangle {
                 wrap: word-wrap;
             }
 
-            Rectangle { height: 5px; background: transparent; }
+            Rectangle { height: 6px; background: transparent; }
 
             HorizontalLayout {
                 spacing: Theme.s-2;

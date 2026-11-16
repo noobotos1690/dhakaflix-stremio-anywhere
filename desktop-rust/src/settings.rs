@@ -124,4 +124,40 @@ impl Settings {
     pub fn set_mode(&mut self, mode: AccessMode) {
         self.public_access_mode = mode.storage().to_string();
     }
+
+    /// A Windows-startup launch stays in the notification area once the
+    /// permanent Tailscale Funnel address exists, so logging in does not throw
+    /// a window over the desktop. Opening the app by hand still shows it.
+    pub fn start_in_tray(&self, autostart: bool) -> bool {
+        autostart && self.mode().is_tailscale() && !self.tailscale_hostname.trim().is_empty()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tailscale(hostname: &str) -> Settings {
+        Settings {
+            public_access_mode: "tailscale".to_string(),
+            tailscale_hostname: hostname.to_string(),
+            ..Settings::default()
+        }
+    }
+
+    #[test]
+    fn manual_launch_always_shows_the_window() {
+        assert!(!tailscale("demo-host.tailnet-test.ts.net").start_in_tray(false));
+    }
+
+    #[test]
+    fn autostart_with_funnel_configured_stays_in_the_tray() {
+        assert!(tailscale("demo-host.tailnet-test.ts.net").start_in_tray(true));
+    }
+
+    #[test]
+    fn autostart_without_a_funnel_hostname_shows_the_window() {
+        assert!(!tailscale("").start_in_tray(true));
+        assert!(!Settings::default().start_in_tray(true));
+    }
 }

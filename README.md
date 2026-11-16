@@ -78,9 +78,9 @@ Prefer a window over a terminal? Download one of these from the
 
 | Build | What it does |
 | --- | --- |
-| `DhakaFlixRelay-Setup-1.3.0.exe` | Per-user installer with Start Menu/desktop shortcuts and an uninstaller |
-| `DhakaFlixRelay-Portable-1.3.0.exe` | Single file: unpacks the full folder into a directory you pick, then launches it |
-| `DhakaFlixRelay-Portable-1.3.0.zip` | Unzip anywhere and run `DhakaFlixRelay.exe`; no install |
+| `DhakaFlixRelay-Setup-1.3.1.exe` | Per-user installer with Start Menu/desktop shortcuts and an uninstaller |
+| `DhakaFlixRelay-Portable-1.3.1.exe` | Single file: unpacks the full folder into a directory you pick, then launches it |
+| `DhakaFlixRelay-Portable-1.3.1.zip` | Unzip anywhere and run `DhakaFlixRelay.exe`; no install |
 
 All three need no administrator rights. The dashboard gives you start, stop and
 restart, live status from `/health`, the Stremio link with copy and install,
@@ -412,3 +412,5 @@ npm run dev
   builds and is easy to add back if you want a standalone `.exe`.
 - `tools/`, `logs/`, `.run/` and `.env` are gitignored - never commit your relay
   secret or the 55 MB tunnel binary.
+- Security policy, release checksums and how to verify a download:
+  [SECURITY.md](SECURITY.md).

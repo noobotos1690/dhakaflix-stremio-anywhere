@@ -128,12 +128,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
+    let start_in_tray = settings.start_in_tray(autostart);
     tracing::info!("Showing the tray icon");
     // A missing tray icon is not worth losing the window over.
     if let Err(error) = tray.show() {
         tracing::warn!("The tray icon could not be shown: {error}");
     }
-    if !autostart {
+    if start_in_tray {
+        tracing::info!(
+            "Starting in the notification area: Tailscale Funnel is configured, open the app from the tray"
+        );
+    } else {
         tracing::info!("Showing the window");
         if let Err(error) = ui.show() {
             fatal(&format!("The window could not be shown: {error}"));
@@ -144,7 +149,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("Starting background tasks");
     controller::spawn_tasks(&app);
-    app.check_for_updates();
+    // An update check can start an installer and restart the app. Never do that
+    // behind a tray-only login start; Settings still has the manual check.
+    if !start_in_tray {
+        app.check_for_updates();
+    }
 
     tracing::info!("Entering the event loop");
     if let Err(error) = slint::run_event_loop() {
