@@ -6,6 +6,10 @@ source is what the Linux port starts from. The Node.js relay, BDIX providers,
 the Stremio addon API and the streaming proxy are unchanged; this app starts and
 supervises that same backend.
 
+The desktop shell is version 1.3.2. The relay and Stremio addon stay at 1.3.1;
+this release changes the Windows app only. Release history is in
+[../CHANGELOG.md](../CHANGELOG.md).
+
 ![Dashboard](docs/overview.png)
 
 ## What it does
@@ -21,6 +25,9 @@ supervises that same backend.
   auth keys and signed `/p/<token>` paths are masked before they reach the UI.
 - Settings for startup, auto-start, tray behaviour, default provider, port,
   maximum streams and log level, plus dependency repair and a preference reset.
+- A resizable window that opens inside the usable desktop and adapts below
+  1080px: icon-only sidebar, tighter gutters, and vertical scrolling on short
+  screens (minimum 800x500).
 
 Closing the window hides it to the notification area. Only **Exit** from the
 tray stops the relay.
@@ -45,12 +52,12 @@ Three builds, all per-user:
 
 | Build | Use it when |
 | --- | --- |
-| `DhakaFlixRelay-Setup-1.3.1.exe` | You want Start Menu/desktop shortcuts and an uninstaller |
-| `DhakaFlixRelay-Portable-1.3.1.exe` | You want one file that unpacks itself into a folder you pick |
-| `DhakaFlixRelay-Portable-1.3.1.zip` | You want an unpacked folder to copy to a USB drive |
+| `DhakaFlixRelay-Setup-1.3.2.exe` | You want Start Menu/desktop shortcuts and an uninstaller |
+| `DhakaFlixRelay-Portable-1.3.2.exe` | You want one file that unpacks itself into a folder you pick |
+| `DhakaFlixRelay-Portable-1.3.2.zip` | You want an unpacked folder to copy to a USB drive |
 
 The binaries are unsigned, so SmartScreen may show *Windows protected your PC*:
-choose **More info → Run anyway**.
+choose **More info**, then **Run anyway**.
 
 All three builds carry the same payload: the app, `runtime\node` (Node.js and
 npm), `node_modules` (the relay's packages) and `tools\cloudflared.exe`. A
@@ -90,9 +97,9 @@ Artifacts land in `desktop-rust\dist`:
 
 ```
 dist\app\DhakaFlixRelay.exe                     staged payload
-dist\DhakaFlixRelay-Setup-1.3.1.exe             per-user installer
-dist\DhakaFlixRelay-Portable-1.3.1.exe          single-file portable extractor
-dist\DhakaFlixRelay-Portable-1.3.1.zip          portable folder
+dist\DhakaFlixRelay-Setup-1.3.2.exe             per-user installer
+dist\DhakaFlixRelay-Portable-1.3.2.exe          single-file portable extractor
+dist\DhakaFlixRelay-Portable-1.3.2.zip          portable folder
 dist\SHA256SUMS.txt                             checksums for the three builds
 ```
 
@@ -108,16 +115,16 @@ is a dark Material-style surface stack with one purple accent:
 
 | Token | Value | Use |
 | --- | --- | --- |
-| `Theme.bg` | `#111218` | Window background |
-| `Theme.sidebar` | `#151620` | Navigation rail |
-| `Theme.surface` | `#1B1D29` | Panels |
-| `Theme.raised` | `#292B3B` | Hover, inputs, selected row |
+| `Theme.bg` | `#0F1016` | Window background |
+| `Theme.sidebar` | `#14151D` | Navigation rail |
+| `Theme.surface` | `#191B24` | Panels |
+| `Theme.raised` | `#262A3A` | Hover, inputs, selected row |
 | `Theme.accent` | `#7957D5` | Primary action, active navigation |
 | `Theme.text` | `#F3F1F8` | Headings, values |
-| `Theme.text-2` | `#A5A5B5` | Labels |
-| `Theme.text-3` | `#77798B` | Hints, metadata |
-| `Theme.border` | `#303242` | Thin separators and focus rings |
-| `Theme.ok / warn / error` | `#69B68B` / `#E2B66B` / `#E17676` | Status only |
+| `Theme.text-2` | `#A7A7B8` | Labels |
+| `Theme.text-3` | `#767889` | Hints, metadata |
+| `Theme.border` | `#2B2D3C` | Thin separators and focus rings |
+| `Theme.ok / warn / error` | `#6FBF8E` / `#DDB16A` / `#E07A7A` | Status only |
 
 Accent colour marks interactivity and the current page. Status colours appear
 next to the state they describe and nowhere else.
@@ -152,11 +159,12 @@ desktop-rust/
 
 ### Dependencies
 
-`slint` 1.18 (winit backend, femtovg renderer, system tray), `slint-build`,
-`tokio`, `serde`/`serde_json`, `tracing`/`tracing-subscriber`, `chrono`,
-`windows-sys` (WinHTTP, registry, threading, shell, BCrypt), `winres` for the
-icon. No TLS stack: HTTPS goes through WinHTTP, so the binary has no OpenSSL
-dependency and no extra runtime files.
+`slint` 1.18 (winit backend, software renderer with a femtovg fallback, system
+tray), `slint-build`, `tokio`, `serde`/`serde_json`,
+`tracing`/`tracing-subscriber`, `chrono`, `windows-sys` (WinHTTP, registry,
+threading, shell, BCrypt, work area and DPI), `winres` for the icon. No TLS
+stack: HTTPS goes through WinHTTP, so the binary has no OpenSSL dependency and
+no extra runtime files.
 
 Process management uses `taskkill /PID <pid> /T` and escalates to `/F` after
 three seconds, because a console node process on Windows has no portable
@@ -167,9 +175,9 @@ graceful signal.
 If the configured port is already in use, the app asks `/health` who is
 listening:
 
-- a DhakaFlix relay → adopted as **Running (external)**; stop and restart are
+- a DhakaFlix relay is adopted as **Running (external)**; stop and restart are
   disabled, the log says so, and the app never kills it;
-- anything else → reported as a port conflict with the owning process name.
+- anything else is reported as a port conflict with the owning process name.
 
 No untrusted PID is ever terminated.
 
@@ -201,9 +209,9 @@ mutex, so they replace each other rather than stacking up.
 ## Tests
 
 ```powershell
-cargo test     # 23 unit tests: .env creation and editing, URL splitting, health
+cargo test     # 27 unit tests: .env creation and editing, URL splitting, health
                # payloads, Tailscale status/funnel fixtures, tray-first startup,
-               # relay output parsing, redaction, crash logging
+               # window sizing, relay output parsing, redaction, crash logging
 npm run smoke  # from the repo root; exercises the Node relay
 ```
 
@@ -223,13 +231,13 @@ to do nothing, look for the tray icon.
 
 ## Limitations
 
-- Live Tailscale Funnel and public streaming were not exercised from this build
-  environment; the parsing and command paths are covered by fixture tests.
+- Funnel health and manifest checks were run from a Windows 11 build. Sustained
+  video playback was not measured, and Tailscale applies bandwidth limits.
 - The binary is unsigned, so SmartScreen warns on first run.
 - Stopping the relay is forceful: the console node process has no graceful
   shutdown channel, so in-flight streams are cut.
-- Funnel is bandwidth-limited by Tailscale and only serves `ts.net` hostnames.
-  A custom domain needs a Cloudflare named tunnel instead.
+- Funnel only serves `ts.net` hostnames. A custom domain needs a Cloudflare named
+  tunnel instead.
 
 ## Licence
 

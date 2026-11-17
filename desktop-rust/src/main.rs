@@ -85,6 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
     };
+    fit_window(&ui);
     tracing::info!("Creating the tray icon");
     let tray = match TrayMenu::new() {
         Ok(tray) => tray,
@@ -168,4 +169,54 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn fatal(message: &str) {
     tracing::error!("{message}");
     winutil::message_box("DhakaFlix Relay", message);
+}
+
+/// Pick an initial window size that fits the usable desktop, then let the user
+/// resize it. A 1366x768 laptop has only about 728px of work area after the
+/// taskbar, so the old fixed 1160x760 window did not fit.
+fn fit_window(ui: &MainWindow) {
+    let Some(area) = winutil::work_area() else { return };
+    let scale = winutil::system_scale();
+    let available_width = area.width as f32 / scale;
+    let available_height = area.height as f32 / scale;
+    let (width, height) = window_size(available_width, available_height);
+    tracing::info!(
+        "Window size {width:.0}x{height:.0} (work area {}x{} at {scale:.2}x)",
+        area.width,
+        area.height
+    );
+    ui.window().set_size(slint::LogicalSize::new(width, height));
+}
+
+/// The desktop app's preferred size, capped to the usable screen and floored at
+/// the smallest layout that still fits the logs toolbar.
+fn window_size(available_width: f32, available_height: f32) -> (f32, f32) {
+    let width = 1120.0_f32.min(available_width - 40.0).max(800.0);
+    let height = 720.0_f32.min(available_height - 40.0).max(500.0);
+    (width, height)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::window_size;
+
+    #[test]
+    fn starts_large_on_a_large_desktop() {
+        assert_eq!(window_size(1920.0, 1050.0), (1120.0, 720.0));
+    }
+
+    #[test]
+    fn fits_a_1366x768_laptop() {
+        assert_eq!(window_size(1366.0, 728.0), (1120.0, 688.0));
+    }
+
+    #[test]
+    fn fits_a_1024x768_screen() {
+        assert_eq!(window_size(1024.0, 728.0), (984.0, 688.0));
+    }
+
+    #[test]
+    fn keeps_the_minimum_size_on_a_short_screen() {
+        assert_eq!(window_size(800.0, 560.0), (800.0, 520.0));
+    }
 }

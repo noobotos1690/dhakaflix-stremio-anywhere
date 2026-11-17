@@ -25,8 +25,9 @@ export component PublicAccessPage inherits Rectangle {
     callback open-funnel-docs();
 
     background: transparent;
+    preferred-height: body.preferred-height;
 
-    VerticalLayout {
+    body := VerticalLayout {
         spacing: Theme.s-4;
 
         // ------------------------------------------------------------ header

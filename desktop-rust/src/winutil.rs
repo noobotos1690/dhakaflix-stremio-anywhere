@@ -1,6 +1,7 @@
 //! Thin wrappers around the handful of Win32 calls the app needs. Keeping them
 //! here means no extra crate, no console window flashing and one place to audit.
 
+use std::ffi::c_void;
 use std::ffi::OsStr;
 use std::io::Write;
 use std::os::windows::ffi::OsStrExt;
@@ -12,11 +13,13 @@ use std::time::Duration;
 use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, HWND};
 use windows_sys::Win32::Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_USE_IMMERSIVE_DARK_MODE};
 use windows_sys::Win32::System::Threading::CreateMutexW;
+use windows_sys::Win32::UI::HiDpi::GetDpiForSystem;
 use windows_sys::Win32::UI::Shell::ShellExecuteW;
 use windows_sys::Win32::Foundation::RECT;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     FindWindowW, GetWindowRect, IsIconic, IsWindowVisible, IsZoomed, MessageBoxW, SetWindowPos,
-    MB_ICONINFORMATION, MB_OK, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER, SW_SHOWNORMAL,
+    SystemParametersInfoW, MB_ICONINFORMATION, MB_OK, SPI_GETWORKAREA, SWP_NOACTIVATE, SWP_NOMOVE,
+    SWP_NOZORDER, SW_SHOWNORMAL,
 };
 
 pub const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -204,6 +207,41 @@ pub fn message_box(title: &str, text: &str) {
             title.as_ptr(),
             MB_OK | MB_ICONINFORMATION,
         );
+    }
+}
+
+pub struct WorkArea {
+    pub width: i32,
+    pub height: i32,
+}
+
+/// Usable desktop area in physical pixels, excluding the taskbar.
+pub fn work_area() -> Option<WorkArea> {
+    let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+    let ok = unsafe {
+        SystemParametersInfoW(
+            SPI_GETWORKAREA,
+            0,
+            &mut rect as *mut RECT as *mut c_void,
+            0,
+        )
+    };
+    if ok == 0 {
+        return None;
+    }
+    Some(WorkArea {
+        width: (rect.right - rect.left).max(1),
+        height: (rect.bottom - rect.top).max(1),
+    })
+}
+
+/// System DPI divided by 96. Slint sizes are logical pixels, Win32 reports physical.
+pub fn system_scale() -> f32 {
+    let dpi = unsafe { GetDpiForSystem() };
+    if dpi == 0 {
+        1.0
+    } else {
+        dpi as f32 / 96.0
     }
 }
 

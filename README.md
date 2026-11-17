@@ -12,10 +12,8 @@ anywhere - not just from a device inside your ISP's network.
 > Docker deployment kit and the documentation needed to run it as a server.
 >
 > **Want the internals?** [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md) explains the
-> whole path from pressing play to bytes arriving - including why a normal cloud
+> whole path from pressing play to bytes arriving, including why a normal cloud
 > host cannot work.
-
----
 
 ## The problem this solves
 
@@ -65,28 +63,39 @@ Relay is running (pid 4820)
   (install URL copied to clipboard)
 ```
 
-Paste that URL into Stremio → Addons → Community on **any** device. The URL is
-copied to your clipboard for you.
+Paste that URL into the Stremio Addons page, under Community, on **any** device.
+The URL is copied to your clipboard for you.
 
 ## Desktop app (one-click)
 
 This Rust + Slint app is the only desktop build. The files below are the Windows
 build; the same source is what the Linux port starts from.
 
+The desktop shell is version 1.3.2. The Stremio addon and relay package remain
+1.3.1, because this release only changes the Windows app.
+
 Prefer a window over a terminal? Download one of these from the
 [Releases page](https://github.com/noobotos1690/dhakaflix-stremio-anywhere/releases/latest):
 
 | Build | What it does |
 | --- | --- |
-| `DhakaFlixRelay-Setup-1.3.1.exe` | Per-user installer with Start Menu/desktop shortcuts and an uninstaller |
-| `DhakaFlixRelay-Portable-1.3.1.exe` | Single file: unpacks the full folder into a directory you pick, then launches it |
-| `DhakaFlixRelay-Portable-1.3.1.zip` | Unzip anywhere and run `DhakaFlixRelay.exe`; no install |
+| `DhakaFlixRelay-Setup-1.3.2.exe` | Per-user installer with Start Menu/desktop shortcuts and an uninstaller |
+| `DhakaFlixRelay-Portable-1.3.2.exe` | Single file: unpacks the full folder into a directory you pick, then launches it |
+| `DhakaFlixRelay-Portable-1.3.2.zip` | Unzip anywhere and run `DhakaFlixRelay.exe`; no install |
+| `SHA256SUMS.txt` | SHA-256 checksums for the three downloads |
 
 All three need no administrator rights. The dashboard gives you start, stop and
 restart, live status from `/health`, the Stremio link with copy and install,
 realtime logs and a launch-at-Windows-startup toggle. Node.js, the npm packages
 and `.env` are set up on first run with a progress bar, and packaged builds
 carry all of it already.
+
+The window is resizable and opens at a size that fits the usable desktop. Below
+1080px the sidebar becomes an icon rail and the page gutters shrink; short
+windows scroll instead of clipping. The smallest supported window is 800x500.
+With **Launch at Windows startup** enabled and Tailscale Funnel configured, a
+login start goes to the notification area without opening a window. Running the
+app again, or choosing **Open dashboard** from the tray, brings it up.
 
 ### Public access: temporary or stable
 
@@ -98,7 +107,8 @@ The addon card has a **Public access** link with two modes:
 | **Tailscale Funnel** | Permanent `https://<machine>.<tailnet>.ts.net` | Tailscale app installed and signed in; MagicDNS and HTTPS certificates enabled; Funnel allowed by the tailnet policy |
 
 Tailscale mode works behind CGNAT and needs no port forwarding. Open **Public
-access → Tailscale Funnel**, click **Connect** if needed, then **Enable Funnel**.
+access**, choose **Tailscale Funnel**, click **Connect** if needed, then click
+**Enable Funnel**.
 The app starts the relay, enables only its own port-443 Funnel listener, verifies
 `/health` and `/manifest.json` over HTTPS, and shows the stable manifest URL.
 The URL survives relay and Windows restarts while the app keeps running.
@@ -115,7 +125,8 @@ keeps the same URL.
 
 The window is a native Rust + Slint application: Overview, Public access,
 Diagnostics, Logs and Settings as separate pages, a log view that filters by
-level and text, and credentials masked before they reach the window.
+level and text, and credentials masked before they reach the window. Release
+history lives in [CHANGELOG.md](CHANGELOG.md).
 
 Build it with `.\desktop-rust\build.ps1` (Rust stable and Inno Setup 6 or 7). All
 three builds carry Node.js, the relay's npm packages and cloudflared inside
@@ -140,7 +151,7 @@ health     http://127.0.0.1:7001/health
 ```
 
 Open the landing page and press **Install in Stremio**, or paste the manifest
-URL into Stremio → Addons → Community.
+URL into the Stremio Addons page, under Community.
 
 ## The scripts
 
@@ -208,7 +219,6 @@ docker compose --profile tunnel up -d             # + stable tunnel
 > cannot route to `172.16.50.0/24`, so searches return nothing and playback
 > fails. The host must be on a network that reaches the mirrors.
 
-
 ### Option C - Tailscale Funnel (no domain, desktop app)
 
 The Windows desktop app can publish the relay through Tailscale Funnel:
@@ -258,8 +268,6 @@ and HTTPS certificates are enabled, the tailnet policy allows `funnel`, and no
 other process on the tailnet already owns port 443. Tailscale also throttles
 sustained video bandwidth, so long streams can be slower than on a Cloudflare
 tunnel.
-
----
 
 ## Configuration
 
@@ -364,6 +372,8 @@ scripts/push-to-github.ps1  fork remotes + push
 scripts/fetch-cloudflared.js  download the tunnel binary
 scripts/smoke.js      end-to-end self-test
 docs/HOW-IT-WORKS.md  architecture walkthrough
+CHANGELOG.md          release history
+SECURITY.md           security policy and release checks
 Dockerfile            production image
 docker-compose.yml    relay + optional tunnel sidecar
 ```

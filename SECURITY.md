@@ -33,9 +33,9 @@ upgrade to the newest installer or portable build.
 - **Dependency audits.** Production npm dependencies are audited with
   `npm audit --omit=dev`. The Rust dependency tree is checked with
   `cargo audit` against the RustSec advisory database before a release. The
-  1.3.1 audit found no known Rust vulnerabilities; six transitive crates are
-  marked unmaintained upstream with no fixed upgrade (`zbus_names`, `zvariant`,
-  `zvariant_derive`, `ttf-parser`, `bincode`, `pin-utils`).
+  current 1.3.x tree has no known Rust vulnerabilities; six transitive crates
+  are marked unmaintained upstream with no fixed upgrade (`zbus_names`,
+  `zvariant`, `zvariant_derive`, `ttf-parser`, `bincode`, `pin-utils`).
 - **Published checksums.** Release notes and `SHA256SUMS.txt` carry the SHA-256
   of every uploaded asset so a download can be verified before it is run.
 
@@ -45,8 +45,8 @@ Download the assets from the [Releases page](https://github.com/noobotos1690/dha
 and compare the hashes:
 
 ```powershell
-Get-FileHash .\DhakaFlixRelay-Setup-1.3.1.exe -Algorithm SHA256
-Get-FileHash .\DhakaFlixRelay-Portable-1.3.1.zip -Algorithm SHA256
+Get-FileHash .\DhakaFlixRelay-Setup-1.3.2.exe -Algorithm SHA256
+Get-FileHash .\DhakaFlixRelay-Portable-1.3.2.zip -Algorithm SHA256
 ```
 
 ```bash

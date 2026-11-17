@@ -7,7 +7,7 @@ This application uses [Slint](https://slint.dev) 1.18 for its user interface.
 Slint is used under the **Slint Royalty-free Desktop, Mobile and Web
 Applications License, Version 2.0**. That licence allows royalty-free use in
 applications that credit Slint as required by its attribution clause. The
-attribution appears in the application (Settings → footer, "interface built with
+attribution appears in the application (Settings footer, "interface built with
 Slint under its royalty-free licence") and in `desktop-rust/README.md`.
 
 Slint is also available under GPLv3; the royalty-free option was chosen so this

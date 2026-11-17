@@ -1,6 +1,6 @@
 import { Theme } from "theme.slint";
 import {
-    BrandMark, NavItem, ConfirmDialog, Toast,
+    BrandMark, NavItem, ConfirmDialog, Toast, PageScroll,
     LogRow, DiagRow, MirrorRow, ServiceInfo, EndpointInfo, CloudflareInfo, TailscaleInfo, PrefsInfo,
 } from "components.slint";
 import { OverviewPage } from "pages/overview.slint";
@@ -13,13 +13,26 @@ export { TrayMenu } from "tray.slint";
 
 export component MainWindow inherits Window {
     title: "DhakaFlix Relay";
-    width: 1160px;
-    height: 760px;
+    // Resizable, with a floor that still fits the compact layout. The Rust side
+    // picks the starting size from the usable desktop area.
+    preferred-width: 1120px;
+    preferred-height: 720px;
+    min-width: 800px;
+    min-height: 500px;
     background: Theme.bg;
     default-font-family: Theme.font;
     default-font-size: Theme.t-body;
 
     // ------------------------------------------------------------- state
+    // Below this width the sidebar becomes an icon rail and the page gutters
+    // shrink, so a 1024-wide screen still has room for the content.
+    // Assigned on resize instead of a binding: the sidebar width feeds back
+    // into the window's preferred width, and a binding forms a loop.
+    in-out property <bool> compact: false;
+    changed width => {
+        root.compact = root.width < 1080px;
+    }
+
     in-out property <int> page: 0;
 
     in property <ServiceInfo> service;
@@ -101,6 +114,10 @@ export component MainWindow inherits Window {
     callback confirm-secondary();
 
     // ------------------------------------------------------------ shell
+    changed page => {
+        page-scroll.content-y = 0;
+    }
+
     Rectangle {
         width: 100%;
         height: 100%;
@@ -111,7 +128,7 @@ export component MainWindow inherits Window {
 
             // ------------------------------------------------- sidebar
             Rectangle {
-                width: 212px;
+                width: root.compact ? 68px : 212px;
                 background: Theme.sidebar;
 
                 Rectangle {
@@ -122,20 +139,29 @@ export component MainWindow inherits Window {
                 }
 
                 VerticalLayout {
-                    padding-left: 12px;
-                    padding-right: 12px;
+                    padding-left: root.compact ? 8px : 12px;
+                    padding-right: root.compact ? 8px : 12px;
                     padding-top: 16px;
                     padding-bottom: 14px;
                     spacing: 6px;
 
-                    HorizontalLayout {
+                    Rectangle {
                         height: 40px;
-                        spacing: 10px;
+                        background: transparent;
 
-                        BrandMark { mark-size: 26px; }
+                        BrandMark {
+                            x: root.compact ? (parent.width - 26px) / 2 : 0px;
+                            y: 7px;
+                            mark-size: 26px;
+                        }
 
-                        VerticalLayout {
+                        if !root.compact : VerticalLayout {
+                            x: 36px;
+                            width: parent.width - 36px;
+                            height: parent.height;
                             spacing: 1px;
+                            alignment: center;
+
                             Text {
                                 text: "DhakaFlix";
                                 color: Theme.text;
@@ -160,61 +186,70 @@ export component MainWindow inherits Window {
                     NavItem {
                         caption: "Overview";
                         icon: "overview";
+                        compact: root.compact;
                         selected: root.page == 0;
                         clicked => { root.page = 0; }
                     }
                     NavItem {
                         caption: "Public access";
                         icon: "globe";
+                        compact: root.compact;
                         selected: root.page == 1;
                         clicked => { root.page = 1; }
                     }
                     NavItem {
                         caption: "Diagnostics";
                         icon: "pulse";
+                        compact: root.compact;
                         selected: root.page == 2;
                         clicked => { root.page = 2; }
                     }
                     NavItem {
                         caption: "Logs";
                         icon: "logs";
+                        compact: root.compact;
                         selected: root.page == 3;
                         clicked => { root.page = 3; }
                     }
                     NavItem {
                         caption: "Settings";
                         icon: "settings";
+                        compact: root.compact;
                         selected: root.page == 4;
                         clicked => { root.page = 4; }
                     }
 
                     Rectangle { vertical-stretch: 1; background: transparent; }
 
-                    Rectangle {
-                        height: 1px;
-                        background: Theme.divider;
-                    }
+                    if !root.compact : VerticalLayout {
+                        spacing: 6px;
 
-                    Rectangle {
-                        height: 38px;
-                        background: transparent;
+                        Rectangle {
+                            height: 1px;
+                            background: Theme.divider;
+                        }
 
-                        HorizontalLayout {
-                            spacing: 7px;
+                        Rectangle {
+                            height: 38px;
+                            background: transparent;
 
-                            VerticalLayout {
-                                spacing: 1px;
-                                Text {
-                                    text: root.service.running ? "Relay online" : "Relay offline";
-                                    color: Theme.text-2;
-                                    font-family: Theme.font;
-                                    font-size: Theme.t-caption;
-                                }
-                                Text {
-                                    text: "port " + root.service.port + "  ·  v" + root.service.version;
-                                    color: Theme.text-4;
-                                    font-family: Theme.mono;
-                                    font-size: 10px;
+                            HorizontalLayout {
+                                spacing: 7px;
+
+                                VerticalLayout {
+                                    spacing: 1px;
+                                    Text {
+                                        text: root.service.running ? "Relay online" : "Relay offline";
+                                        color: Theme.text-2;
+                                        font-family: Theme.font;
+                                        font-size: Theme.t-caption;
+                                    }
+                                    Text {
+                                        text: "port " + root.service.port + "  ·  v" + root.service.version;
+                                        color: Theme.text-4;
+                                        font-family: Theme.mono;
+                                        font-size: 10px;
+                                    }
                                 }
                             }
                         }
@@ -227,13 +262,16 @@ export component MainWindow inherits Window {
                 horizontal-stretch: 1;
                 background: Theme.bg;
 
-                VerticalLayout {
-                    padding-left: 24px;
-                    padding-right: 24px;
-                    padding-top: 18px;
-                    padding-bottom: 20px;
+                page-scroll := PageScroll {
+                    width: 100%;
+                    height: 100%;
+                    pad-left: root.compact ? 14px : 24px;
+                    pad-right: root.compact ? 14px : 24px;
+                    pad-top: root.compact ? 12px : 18px;
+                    pad-bottom: root.compact ? 14px : 20px;
 
                     if page == 0 : OverviewPage {
+                        vertical-stretch: 1;
                         service: root.service;
                         endpoint: root.endpoint;
                         recent: root.recent;
@@ -248,6 +286,7 @@ export component MainWindow inherits Window {
                     }
 
                     if page == 1 : PublicAccessPage {
+                        vertical-stretch: 1;
                         provider: root.prefs.provider;
                         cloudflare: root.cloudflare;
                         tailscale: root.tailscale;
@@ -268,6 +307,7 @@ export component MainWindow inherits Window {
                     }
 
                     if page == 2 : DiagnosticsPage {
+                        vertical-stretch: 1;
                         checks: root.checks;
                         mirrors: root.mirrors;
                         summary: root.diag-summary;
@@ -277,6 +317,8 @@ export component MainWindow inherits Window {
                     }
 
                     if page == 3 : LogsPage {
+                        vertical-stretch: 1;
+                        narrow: root.compact;
                         rows: root.logs;
                         tick: root.log-tick;
                         level: root.log-level;
@@ -293,6 +335,7 @@ export component MainWindow inherits Window {
                     }
 
                     if page == 4 : SettingsPage {
+                        vertical-stretch: 1;
                         prefs: root.prefs;
                         provider: root.prefs.provider;
                         log-level: root.prefs.log-level;

@@ -479,6 +479,7 @@ export component NavItem inherits FocusScope {
     in property <string> caption: "";
     in property <string> icon: "overview";
     in property <bool> selected: false;
+    in property <bool> compact: false;
     callback clicked;
 
     height: 34px;
@@ -525,13 +526,13 @@ export component NavItem inherits FocusScope {
     }
 
     Icon {
-        x: 11px;
+        x: root.compact ? (parent.width - 16px) / 2 : 11px;
         y: (parent.height - 16px) / 2;
         kind: root.icon;
         tint: root.selected ? Theme.accent-hover : Theme.text-3;
     }
 
-    Text {
+    if !root.compact : Text {
         x: 39px;
         y: 0;
         width: parent.width - 47px;
@@ -737,8 +738,45 @@ export component Panel inherits Rectangle {
     }
 }
 
-export component Metric inherits VerticalLayout {
-    in property <string> label: "";
+// Page viewport: fills the window when the page is short, scrolls vertically
+// when the window is too short for the page (small laptop screens).
+export component PageScroll inherits Flickable {
+    in property <length> pad-left: 24px;
+    in property <length> pad-right: 24px;
+    in property <length> pad-top: 18px;
+    in property <length> pad-bottom: 20px;
+
+    interactive: root.content-height > root.height + 1px;
+    content-width: root.width;
+    content-height: max(root.height, body.preferred-height);
+
+    body := VerticalLayout {
+        width: root.width;
+        height: root.content-height;
+        padding-left: root.pad-left;
+        padding-right: root.pad-right;
+        padding-top: root.pad-top;
+        padding-bottom: root.pad-bottom;
+        @children
+    }
+
+    // Flickable has no scrollbar of its own; this is the usual 4px overlay.
+    bar := Rectangle {
+        visible: root.content-height > root.height + 2px;
+        x: root.width - 7px;
+        width: 4px;
+        height: max(28px, root.height * (root.height / max(1px, root.content-height)));
+        y: max(2px, min(
+            root.height - self.height - 2px,
+            2px + (-root.content-y) / max(1px, root.content-height - root.height)
+                * (root.height - self.height - 4px)
+        ));
+        border-radius: 2px;
+        background: #5a5f76;
+    }
+}
+
+export component Metric inherits VerticalLayout {    in property <string> label: "";
     in property <string> value: "";
     in property <string> kind: "idle";
     spacing: 5px;

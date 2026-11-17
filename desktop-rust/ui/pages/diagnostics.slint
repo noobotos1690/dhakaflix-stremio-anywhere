@@ -11,8 +11,9 @@ export component DiagnosticsPage inherits Rectangle {
     callback open-logs();
 
     background: transparent;
+    preferred-height: body.preferred-height;
 
-    VerticalLayout {
+    body := VerticalLayout {
         spacing: Theme.s-4;
 
         Rectangle {

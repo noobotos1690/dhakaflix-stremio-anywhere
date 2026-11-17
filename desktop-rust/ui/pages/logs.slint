@@ -11,6 +11,7 @@ export component LogsPage inherits Rectangle {
     in property <int> shown: 0;
     in property <int> total: 0;
     in-out property <bool> follow: true;
+    in property <bool> narrow: false;
 
     callback set-level(string);
     callback set-search(string);
@@ -20,8 +21,9 @@ export component LogsPage inherits Rectangle {
     callback open-logs();
 
     background: transparent;
+    preferred-height: body.preferred-height;
 
-    VerticalLayout {
+    body := VerticalLayout {
         spacing: Theme.s-3;
 
         Rectangle {
@@ -51,7 +53,7 @@ export component LogsPage inherits Rectangle {
                 }
 
                 TextField {
-                    field-width: 220px;
+                    field-width: root.narrow ? 110px : 220px;
                     placeholder: "Filter text";
                     value <=> root.search;
                     edited(value) => { root.set-search(value); }
