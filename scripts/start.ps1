@@ -49,14 +49,28 @@ if (-not (Test-Path (Join-Path $root '.env'))) {
 }
 
 # Resolve the port: parameter > .env > default
-if ($Port -le 0) {
-    $Port = 7001
-    $envFile = Join-Path $root '.env'
-    if (Test-Path $envFile) {
-        $match = Select-String -Path $envFile -Pattern '^\s*PORT\s*=\s*(\d+)' | Select-Object -First 1
-        if ($match) { $Port = [int]$match.Matches[0].Groups[1].Value }
+$envFile = Join-Path $root '.env'
+$envValues = @{}
+if (Test-Path $envFile) {
+    foreach ($line in Get-Content $envFile) {
+        if ($line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$' -and $line -notmatch '^\s*#') {
+            $envValues[$Matches[1].ToUpper()] = $Matches[2].Trim().Trim('"').Trim("'")
+        }
     }
 }
+
+if ($Port -le 0) {
+    $Port = 7001
+    if ($envValues['PORT']) { $Port = [int]$envValues['PORT'] }
+}
+
+# Only request the quick tunnel when nothing else is configured. The desktop
+# app's Tailscale Funnel mode writes PUBLIC_URL=https://<host>.<tailnet>.ts.net
+# with TUNNEL=0 and no token; forcing --tunnel there would start a stray
+# cloudflared quick tunnel next to Funnel.
+$publicUrlFromEnv = $envValues['PUBLIC_URL']
+$useQuickTunnel = -not ($envValues['TUNNEL_TOKEN'] -or ($publicUrlFromEnv -match '\.ts\.net$'))
+$tunnelArgs = if ($useQuickTunnel) { @('--tunnel') } else { @() }
 
 $portInUse = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
 if ($portInUse) {
@@ -79,15 +93,19 @@ if ($Background) {
     $stderr = Join-Path $logDir 'relay.err.log'
     Remove-Item $stdout, $stderr -Force -ErrorAction SilentlyContinue
 
-    $proc = Start-Process -FilePath 'node' -ArgumentList 'index.js', '--tunnel' `
+    $proc = Start-Process -FilePath 'node' -ArgumentList (@('index.js') + $tunnelArgs) `
         -WorkingDirectory $root -RedirectStandardOutput $stdout -RedirectStandardError $stderr `
         -WindowStyle Hidden -PassThru
 
     Set-Content -Path (Join-Path $runDir 'relay.pid') -Value $proc.Id -Encoding ascii
 
-    # Wait for the tunnel hostname to appear in the log.
+    # Wait for the tunnel hostname to appear in the log. Named tunnels and
+    # Tailscale Funnel print no trycloudflare URL; PUBLIC_URL is used instead.
     $url = $null
-    for ($i = 0; $i -lt 60; $i++) {
+    if (-not $useQuickTunnel -and $publicUrlFromEnv) {
+        $url = $publicUrlFromEnv.TrimEnd('/')
+    }
+    for ($i = 0; $i -lt 60 -and -not $url; $i++) {
         Start-Sleep -Milliseconds 700
         if ($proc.HasExited) {
             Fail "The relay exited immediately. See $stderr"
@@ -131,4 +149,4 @@ if ($Open) {
     } -ArgumentList $Port | Out-Null
 }
 
-& node index.js --tunnel
+& node index.js @tunnelArgs

@@ -14,6 +14,13 @@ anywhere - not just from a device inside your ISP's network.
 > **Want the internals?** [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md) explains the
 > whole path from pressing play to bytes arriving, including why a normal cloud
 > host cannot work.
+>
+> **Remote access guides:**
+> [docs/HTTP-REMOTE-ACCESS.md](docs/HTTP-REMOTE-ACCESS.md) (reach the addon from
+> anywhere: local, Cloudflare Tunnel, Tailscale Funnel) ·
+> [docs/WINDOWS-SSH-SETUP.md](docs/WINDOWS-SSH-SETUP.md) (privately administer the
+> Windows PC over SSH via Tailscale) ·
+> [docs/REMOTE-ACCESS-TROUBLESHOOTING.md](docs/REMOTE-ACCESS-TROUBLESHOOTING.md)
 
 ## The problem this solves
 
@@ -168,6 +175,10 @@ All wrappers are thin PowerShell entry points; run them directly if you prefer.
 | `scripts\autostart.ps1 -Install` | start the relay automatically at Windows login |
 | `scripts\autostart.ps1 -Status` | check whether autostart is registered |
 | `scripts\autostart.ps1 -Uninstall` | remove the autostart task |
+| `scripts\ssh-setup.ps1 -Status` | inspect OpenSSH Server / firewall / Tailscale state |
+| `scripts\ssh-setup.ps1 -Install` | install OpenSSH Server with a Tailscale-only firewall rule (elevated) |
+| `scripts\ssh-setup.ps1 -AddKey` | authorize an SSH public key (elevated) |
+| `scripts\ssh-setup.ps1 -Uninstall` | stop sshd and remove the rule it created (elevated) |
 | `npm run smoke` | end-to-end self-test against a running relay |
 
 If PowerShell blocks the scripts, the `.cmd` files already pass
@@ -218,6 +229,10 @@ docker compose --profile tunnel up -d             # + stable tunnel
 > A regular cloud VPS (Fly, Render, Railway, Hetzner…) will **not** work: it
 > cannot route to `172.16.50.0/24`, so searches return nothing and playback
 > fails. The host must be on a network that reaches the mirrors.
+
+Full walkthroughs, including the Cloudflare terms-of-service limits on video
+delivery and a complete Tailscale Funnel tutorial:
+[docs/HTTP-REMOTE-ACCESS.md](docs/HTTP-REMOTE-ACCESS.md).
 
 ### Option C - Tailscale Funnel (no domain, desktop app)
 
@@ -368,10 +383,14 @@ scripts/setup.ps1     first-time setup
 scripts/start.ps1     start (foreground or -Background)
 scripts/stop.ps1      stop relay + tunnel
 scripts/autostart.ps1 run at Windows login
+scripts/ssh-setup.ps1   Windows OpenSSH Server setup for Tailscale-only SSH
 scripts/push-to-github.ps1  fork remotes + push
 scripts/fetch-cloudflared.js  download the tunnel binary
 scripts/smoke.js      end-to-end self-test
 docs/HOW-IT-WORKS.md  architecture walkthrough
+docs/HTTP-REMOTE-ACCESS.md       public HTTPS access: local, Cloudflare, Tailscale Funnel
+docs/WINDOWS-SSH-SETUP.md        private SSH administration via Tailscale + OpenSSH
+docs/REMOTE-ACCESS-TROUBLESHOOTING.md  layer-by-layer diagnostics
 CHANGELOG.md          release history
 SECURITY.md           security policy and release checks
 Dockerfile            production image

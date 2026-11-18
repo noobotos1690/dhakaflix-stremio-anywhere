@@ -68,6 +68,25 @@ signature.
   The published fix requires downgrading the SDK to 0.7.1, which would break
   the addon API. They are tracked until the SDK publishes a compatible release.
 
+## Remote access surfaces
+
+The project documents two ways to reach the relay PC remotely; both are
+opt-in and neither weakens the relay's own controls:
+
+- **Public HTTP (Stremio addon):** Cloudflare Tunnel or Tailscale Funnel
+  forwards public HTTPS to `127.0.0.1:7001`. The exposed surface stays the
+  same set of endpoints documented in `docs/HOW-IT-WORKS.md` §13 - manifest,
+  stream/meta, signed `/p/<token>` relay, and `/health`. Cloudflare's
+  service-specific terms restrict serving video/large files through its CDN
+  on self-serve plans; `docs/HTTP-REMOTE-ACCESS.md` explains the distinction
+  between public hostname routes and private network routes.
+- **Private SSH (administration):** `scripts/ssh-setup.ps1` configures
+  Microsoft's OpenSSH Server with a firewall rule restricted to the Tailscale
+  ranges (`100.64.0.0/10`, `fd7a:115c:a1e0::/48`). It is idempotent, requires
+  an elevated shell for changes, never overwrites `sshd_config` or existing
+  keys, never disables password authentication, and never exposes port 22 to
+  the public internet. See `docs/WINDOWS-SSH-SETUP.md`.
+
 ## Scope
 
 This policy covers the relay source in this repository and the Windows desktop
